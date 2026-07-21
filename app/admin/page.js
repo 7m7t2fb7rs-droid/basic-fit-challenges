@@ -122,12 +122,12 @@ function Dashboard({ email }) {
         <p className="text-neutral-500">Chargement…</p>
       ) : (
         <>
-          <ChallengesManager challenges={challenges} onChange={reload} />
           <ScoresManager
             challenges={challenges}
             entries={entries}
             onChange={reload}
           />
+          <ChallengesManager challenges={challenges} onChange={reload} />
         </>
       )}
     </div>
