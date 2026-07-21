@@ -375,6 +375,7 @@ function ScoresManager({ challenges, entries, onChange }) {
   const [selectedId, setSelectedId] = useState(challenges[0]?.id || "");
   const [name, setName] = useState("");
   const [value, setValue] = useState("");
+  const [verifiedBy, setVerifiedBy] = useState("");
   const [busy, setBusy] = useState(false);
 
   const selected = challenges.find((c) => c.id === selectedId);
@@ -389,11 +390,13 @@ function ScoresManager({ challenges, entries, onChange }) {
       challenge_id: selectedId,
       participant_name: name.trim(),
       raw_value: value.trim(),
+      verified_by: verifiedBy.trim() || null,
     });
     setBusy(false);
     if (error) return alert(error.message);
     setName("");
     setValue("");
+    setVerifiedBy("");
     onChange();
   };
 
@@ -430,7 +433,7 @@ function ScoresManager({ challenges, entries, onChange }) {
         <>
           <form onSubmit={add} className="mt-4 flex flex-wrap items-end gap-2">
             <label className="text-sm">
-              <span className="mb-1 block text-neutral-500">Nom</span>
+              <span className="mb-1 block text-neutral-500">Participant</span>
               <input
                 required
                 value={name}
@@ -451,6 +454,15 @@ function ScoresManager({ challenges, entries, onChange }) {
                 className="w-32 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
               />
             </label>
+            <label className="text-sm">
+              <span className="mb-1 block text-neutral-500">Vérifié par</span>
+              <input
+                value={verifiedBy}
+                onChange={(e) => setVerifiedBy(e.target.value)}
+                placeholder="Ton prénom"
+                className="w-36 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              />
+            </label>
             <button
               disabled={busy}
               className="rounded-lg bg-bf-orange px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
@@ -467,6 +479,7 @@ function ScoresManager({ challenges, entries, onChange }) {
                   <th className="px-2 py-1">Nom</th>
                   <th className="px-2 py-1">Perf</th>
                   <th className="px-2 py-1">Points</th>
+                  <th className="px-2 py-1">Vérifié par</th>
                   <th className="px-2 py-1"></th>
                 </tr>
               </thead>
@@ -477,6 +490,9 @@ function ScoresManager({ challenges, entries, onChange }) {
                     <td className="px-2 py-1.5 font-semibold">{r.participant_name}</td>
                     <td className="px-2 py-1.5 text-neutral-600">{r.raw_value}</td>
                     <td className="text-bf-dark px-2 py-1.5 font-extrabold">{r.points}</td>
+                    <td className="px-2 py-1.5 text-neutral-400 italic">
+                      {r.verified_by || "—"}
+                    </td>
                     <td className="px-2 py-1.5 text-right">
                       <button
                         onClick={() => remove(r.id)}
@@ -489,7 +505,7 @@ function ScoresManager({ challenges, entries, onChange }) {
                 ))}
                 {ranked.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-2 py-3 text-neutral-400">
+                    <td colSpan={6} className="px-2 py-3 text-neutral-400">
                       Aucune performance pour ce défi.
                     </td>
                   </tr>
