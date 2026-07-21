@@ -53,6 +53,9 @@ export default function HomePage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-extrabold tracking-tight">Classement général</h1>
+        <p className="mt-2 text-sm text-neutral-500">
+          Pendant 3 mois, plusieurs défis sont proposés à la salle. Chaque participation rapporte des points et te permet de grimper au classement — le total ici reflète l&apos;ensemble de tes points sur tous les défis.
+        </p>
       </div>
 
       {board.length === 0 ? (
