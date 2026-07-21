@@ -25,7 +25,6 @@ const IconAdmin = () => (
 const TABS = [
   { href: "/", label: "Classement", Icon: IconClassement },
   { href: "/defis", label: "Défis", Icon: IconDefis },
-  { href: "/admin", label: "Admin", Icon: IconAdmin },
 ];
 
 export default function Nav() {
@@ -41,6 +40,16 @@ export default function Nav() {
           {/* Logo */}
           <Link href="/" className="shrink-0 font-extrabold text-white tracking-tight">
             🏋️ <span className="hidden sm:inline">Challenges </span>Basic Fit
+          </Link>
+
+          {/* Admin — mobile, discret en haut à droite */}
+          <Link
+            href="/admin"
+            className={`ml-auto sm:hidden text-[11px] font-medium transition ${
+              isActive("/admin") ? "text-white" : "text-white/40 hover:text-white/70"
+            }`}
+          >
+            Admin
           </Link>
 
           {/* Liens centrés — desktop uniquement */}
