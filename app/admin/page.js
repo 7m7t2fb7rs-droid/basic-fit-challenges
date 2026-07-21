@@ -377,14 +377,26 @@ function ScoresManager({ challenges, entries, onChange }) {
   const [value, setValue] = useState("");
   const [verifiedBy, setVerifiedBy] = useState("");
   const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState(null);
 
   const selected = challenges.find((c) => c.id === selectedId);
   const chEntries = entries.filter((e) => e.challenge_id === selectedId);
   const ranked = selected ? rankChallenge(chEntries, selected.metric) : [];
 
+  const validate = (raw, metric) => {
+    if (metric === "time" && !/^\d+:[0-5]\d$/.test(raw.trim()))
+      return "Format temps invalide — utilise mm:ss (ex: 2:40)";
+    if (metric === "reps" && !/^\d+$/.test(raw.trim()))
+      return "Nombre de répétitions invalide — utilise un entier (ex: 42)";
+    return null;
+  };
+
   const add = async (e) => {
     e.preventDefault();
     if (!selectedId) return;
+    const err = validate(value, selected.metric);
+    if (err) { setFormError(err); return; }
+    setFormError(null);
     setBusy(true);
     const { error } = await supabase.from("entries").insert({
       challenge_id: selectedId,
@@ -393,14 +405,15 @@ function ScoresManager({ challenges, entries, onChange }) {
       verified_by: verifiedBy.trim() || null,
     });
     setBusy(false);
-    if (error) return alert(error.message);
+    if (error) { setFormError(error.message); return; }
     setName("");
     setValue("");
     setVerifiedBy("");
     onChange();
   };
 
-  const remove = async (id) => {
+  const remove = async (id, participantName) => {
+    if (!confirm(`Supprimer le score de « ${participantName} » ?`)) return;
     const { error } = await supabase.from("entries").delete().eq("id", id);
     if (error) return alert(error.message);
     onChange();
@@ -470,6 +483,9 @@ function ScoresManager({ challenges, entries, onChange }) {
               {busy ? "…" : "Ajouter"}
             </button>
           </form>
+          {formError && (
+            <p className="mt-2 text-sm text-red-600">{formError}</p>
+          )}
 
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
@@ -495,7 +511,7 @@ function ScoresManager({ challenges, entries, onChange }) {
                     </td>
                     <td className="px-2 py-1.5 text-right">
                       <button
-                        onClick={() => remove(r.id)}
+                        onClick={() => remove(r.id, r.participant_name)}
                         className="text-xs font-semibold text-red-500 hover:underline"
                       >
                         Suppr.

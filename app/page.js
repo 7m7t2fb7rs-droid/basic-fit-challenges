@@ -10,7 +10,6 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [board, setBoard] = useState([]);
-  const [challenges, setChallenges] = useState([]);
   const [activeChallenges, setActiveChallenges] = useState([]);
   const [byCh, setByCh] = useState({});
 
@@ -32,7 +31,6 @@ export default function HomePage() {
         });
 
         const counting = allCh.filter((c) => c.status !== "upcoming");
-        setChallenges(counting);
         setBoard(buildLeaderboard(counting, map));
         setActiveChallenges(allCh.filter((c) => c.status === "active"));
         setByCh(map);

@@ -11,8 +11,8 @@ export default function RootLayout({ children }) {
     <html lang="fr">
       <body>
         <Nav />
-        <main className="mx-auto max-w-4xl px-4 py-6 pb-24 sm:pb-8">{children}</main>
-        <footer className="hidden sm:block py-10 text-center text-xs text-neutral-400">
+        <main className="mx-auto max-w-4xl px-4 py-6 pb-28 sm:pb-8">{children}</main>
+        <footer className="hidden sm:block border-t border-neutral-200 py-10 text-center text-xs text-neutral-400">
           Challenges Basic Fit · Accroche-toi, Dépasse-toi
         </footer>
       </body>
