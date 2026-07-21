@@ -71,9 +71,12 @@ export default function HomePage() {
             const ranked = rankChallenge(byCh[ch.id] || [], ch.metric);
             return (
               <div key={ch.id} className="rounded-2xl bg-white p-5 shadow-sm">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="inline-block h-2 w-2 rounded-full bg-green-400 animate-pulse" />
-                  <h2 className="font-bold text-lg">{ch.name}</h2>
+                <div className="flex items-start gap-2 mb-3">
+                  <span className="inline-block mt-1.5 h-2 w-2 shrink-0 rounded-full bg-green-400 animate-pulse" />
+                  <div>
+                    <h2 className="font-bold text-lg leading-tight">{ch.name}</h2>
+                    <span className="text-xs text-green-600 font-semibold">En cours</span>
+                  </div>
                   <span className="ml-auto text-xs text-neutral-400 uppercase tracking-wide">
                     {METRIC_LABEL[ch.metric]}
                   </span>
