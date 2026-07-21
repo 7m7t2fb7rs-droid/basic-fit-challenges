@@ -53,9 +53,6 @@ export default function HomePage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-extrabold tracking-tight">Classement général</h1>
-        <p className="text-sm text-neutral-500">
-          Système de points F1, cumulé sur tous les défis.
-        </p>
       </div>
 
       {board.length === 0 ? (
