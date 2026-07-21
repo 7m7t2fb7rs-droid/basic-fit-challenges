@@ -113,9 +113,9 @@ export default function HomePage() {
         </>
       )}
 
-      {/* Séparateur défi en cours */}
+      {/* Séparateur orange + titre défi en cours */}
       {activeChallenges.length > 0 && (
-        <div>
+        <div className="border-t-4 border-bf-orange pt-6">
           <h2 className="text-lg font-extrabold tracking-tight">Défi en cours</h2>
           <p className="mt-1 text-sm text-neutral-500">
             Participe avant la fin et grimpe au classement général.
