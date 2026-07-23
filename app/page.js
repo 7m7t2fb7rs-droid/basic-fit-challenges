@@ -37,7 +37,7 @@ function Countdown() {
   );
   const Sep = () => <span className="text-xl font-bold text-bf-orange pb-3">:</span>;
   return (
-    <div className="mt-3 inline-flex items-end gap-2 rounded-xl bg-bf-light px-4 py-2">
+    <div className="inline-flex items-end gap-2 rounded-xl bg-bf-light px-4 py-2">
       <Cell v={days} label="jours" />
       <Sep />
       <Cell v={hours} label="heures" />
@@ -105,7 +105,9 @@ export default function HomePage() {
         <p className="mt-2 text-sm text-neutral-500">
           Pendant 3 mois, plusieurs défis sont proposés à la salle. Chaque participation rapporte des points et te permet de grimper au classement — le total ici reflète l&apos;ensemble de tes points sur tous les défis.
         </p>
-        <Countdown />
+        <div className="flex justify-center mt-3">
+          <Countdown />
+        </div>
       </div>
 
       {board.length === 0 ? (
