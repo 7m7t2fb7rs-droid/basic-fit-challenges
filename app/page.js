@@ -4,6 +4,51 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { buildLeaderboard, rankChallenge, METRIC_LABEL } from "@/lib/scoring";
 
+const END_DATE = new Date("2026-09-25T23:59:59");
+
+function useCountdown(target) {
+  const calc = () => {
+    const diff = target - Date.now();
+    if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0, done: true };
+    return {
+      days: Math.floor(diff / 86400000),
+      hours: Math.floor((diff % 86400000) / 3600000),
+      minutes: Math.floor((diff % 3600000) / 60000),
+      seconds: Math.floor((diff % 60000) / 1000),
+      done: false,
+    };
+  };
+  const [time, setTime] = useState(calc);
+  useEffect(() => {
+    const id = setInterval(() => setTime(calc()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return time;
+}
+
+function Countdown() {
+  const { days, hours, minutes, seconds, done } = useCountdown(END_DATE);
+  if (done) return <p className="mt-3 text-sm font-semibold text-bf-dark">Le classement est terminé !</p>;
+  const Cell = ({ v, label }) => (
+    <div className="flex flex-col items-center">
+      <span className="text-2xl font-extrabold text-bf-dark leading-none">{String(v).padStart(2, "0")}</span>
+      <span className="text-[10px] uppercase tracking-wide text-neutral-400 mt-0.5">{label}</span>
+    </div>
+  );
+  const Sep = () => <span className="text-xl font-bold text-bf-orange pb-3">:</span>;
+  return (
+    <div className="mt-3 inline-flex items-end gap-2 rounded-xl bg-bf-light px-4 py-2">
+      <Cell v={days} label="jours" />
+      <Sep />
+      <Cell v={hours} label="heures" />
+      <Sep />
+      <Cell v={minutes} label="min" />
+      <Sep />
+      <Cell v={seconds} label="sec" />
+    </div>
+  );
+}
+
 const MEDAL = ["🥇", "🥈", "🥉"];
 
 export default function HomePage() {
@@ -60,6 +105,7 @@ export default function HomePage() {
         <p className="mt-2 text-sm text-neutral-500">
           Pendant 3 mois, plusieurs défis sont proposés à la salle. Chaque participation rapporte des points et te permet de grimper au classement — le total ici reflète l&apos;ensemble de tes points sur tous les défis.
         </p>
+        <Countdown />
       </div>
 
       {board.length === 0 ? (
