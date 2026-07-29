@@ -372,14 +372,19 @@ function ChallengeRow({ challenge, onChange }) {
 
 /* ---------------------- Gestion des scores ------------------------ */
 function ScoresManager({ challenges, entries, onChange }) {
-  const [selectedId, setSelectedId] = useState(challenges[0]?.id || "");
+  const sorted = [...challenges].sort((a, b) => {
+    if (a.status === "active" && b.status !== "active") return -1;
+    if (b.status === "active" && a.status !== "active") return 1;
+    return 0;
+  });
+  const [selectedId, setSelectedId] = useState(sorted[0]?.id || "");
   const [name, setName] = useState("");
   const [value, setValue] = useState("");
   const [verifiedBy, setVerifiedBy] = useState("");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState(null);
 
-  const selected = challenges.find((c) => c.id === selectedId);
+  const selected = sorted.find((c) => c.id === selectedId);
   const chEntries = entries.filter((e) => e.challenge_id === selectedId);
   const ranked = selected ? rankChallenge(chEntries, selected.metric) : [];
 
@@ -434,9 +439,9 @@ function ScoresManager({ challenges, entries, onChange }) {
           className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm sm:w-72"
         >
           <option value="">— choisir —</option>
-          {challenges.map((c) => (
+          {sorted.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name} ({METRIC_LABEL[c.metric]})
+              {c.status === "active" ? "⚡ " : ""}{c.name} ({METRIC_LABEL[c.metric]})
             </option>
           ))}
         </select>
