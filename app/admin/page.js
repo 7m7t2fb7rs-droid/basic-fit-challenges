@@ -501,23 +501,13 @@ function ScoresManager({ challenges, entries, onChange }) {
               </thead>
               <tbody>
                 {ranked.map((r) => (
-                  <tr key={r.id} className="border-t border-neutral-100">
-                    <td className="px-2 py-1.5 font-bold text-neutral-500">{r.rank}</td>
-                    <td className="px-2 py-1.5 font-semibold">{r.participant_name}</td>
-                    <td className="px-2 py-1.5 text-neutral-600">{r.raw_value}</td>
-                    <td className="text-bf-dark px-2 py-1.5 font-extrabold">{r.points}</td>
-                    <td className="px-2 py-1.5 text-neutral-400 italic">
-                      {r.verified_by || "—"}
-                    </td>
-                    <td className="px-2 py-1.5 text-right">
-                      <button
-                        onClick={() => remove(r.id, r.participant_name)}
-                        className="text-xs font-semibold text-red-500 hover:underline"
-                      >
-                        Suppr.
-                      </button>
-                    </td>
-                  </tr>
+                  <ScoreRow
+                    key={r.id}
+                    r={r}
+                    metric={selected.metric}
+                    onSave={onChange}
+                    onRemove={remove}
+                  />
                 ))}
                 {ranked.length === 0 && (
                   <tr>
@@ -532,5 +522,110 @@ function ScoresManager({ challenges, entries, onChange }) {
         </>
       )}
     </section>
+  );
+}
+
+/* ----------------------- Ligne score éditable ---------------------- */
+function ScoreRow({ r, metric, onSave, onRemove }) {
+  const [editing, setEditing] = useState(false);
+  const [rawValue, setRawValue] = useState(r.raw_value);
+  const [verifiedBy, setVerifiedBy] = useState(r.verified_by || "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const validate = (v) => {
+    if (metric === "time" && !/^\d+:[0-5]\d$/.test(v.trim()))
+      return "Format invalide (ex: 2:40)";
+    if (metric === "reps" && !/^\d+$/.test(v.trim()))
+      return "Nombre invalide (ex: 42)";
+    return null;
+  };
+
+  const save = async () => {
+    const e = validate(rawValue);
+    if (e) { setErr(e); return; }
+    setErr(null);
+    setBusy(true);
+    const { error } = await supabase
+      .from("entries")
+      .update({ raw_value: rawValue.trim(), verified_by: verifiedBy.trim() || null })
+      .eq("id", r.id);
+    setBusy(false);
+    if (error) { setErr(error.message); return; }
+    setEditing(false);
+    onSave();
+  };
+
+  const cancel = () => {
+    setEditing(false);
+    setRawValue(r.raw_value);
+    setVerifiedBy(r.verified_by || "");
+    setErr(null);
+  };
+
+  if (!editing) {
+    return (
+      <tr className="border-t border-neutral-100">
+        <td className="px-2 py-1.5 font-bold text-neutral-500">{r.rank}</td>
+        <td className="px-2 py-1.5 font-semibold">{r.participant_name}</td>
+        <td className="px-2 py-1.5 text-neutral-600">{r.raw_value}</td>
+        <td className="text-bf-dark px-2 py-1.5 font-extrabold">{r.points}</td>
+        <td className="px-2 py-1.5 text-neutral-400 italic">{r.verified_by || "—"}</td>
+        <td className="px-2 py-1.5 text-right whitespace-nowrap">
+          <button
+            onClick={() => setEditing(true)}
+            className="text-xs font-semibold text-bf-dark hover:underline mr-2"
+          >
+            Modifier
+          </button>
+          <button
+            onClick={() => onRemove(r.id, r.participant_name)}
+            className="text-xs font-semibold text-red-500 hover:underline"
+          >
+            Suppr.
+          </button>
+        </td>
+      </tr>
+    );
+  }
+
+  return (
+    <tr className="border-t border-bf-orange/30 bg-bf-light/40">
+      <td className="px-2 py-2 font-bold text-neutral-400">{r.rank}</td>
+      <td className="px-2 py-2 font-semibold">{r.participant_name}</td>
+      <td className="px-2 py-2">
+        <input
+          value={rawValue}
+          onChange={(e) => setRawValue(e.target.value)}
+          placeholder={metric === "time" ? "2:40" : "42"}
+          className="w-24 rounded border border-neutral-300 px-2 py-1 text-sm"
+        />
+        {err && <p className="text-xs text-red-500 mt-0.5">{err}</p>}
+      </td>
+      <td className="px-2 py-2 text-neutral-400">—</td>
+      <td className="px-2 py-2">
+        <input
+          value={verifiedBy}
+          onChange={(e) => setVerifiedBy(e.target.value)}
+          placeholder="Prénom"
+          className="w-24 rounded border border-neutral-300 px-2 py-1 text-sm"
+        />
+      </td>
+      <td className="px-2 py-2 text-right whitespace-nowrap">
+        <button
+          onClick={save}
+          disabled={busy}
+          className="text-xs font-semibold text-white bg-bf-orange rounded px-2 py-1 mr-1 disabled:opacity-60"
+        >
+          {busy ? "…" : "OK"}
+        </button>
+        <button
+          onClick={cancel}
+          className="text-xs font-semibold text-neutral-500 hover:underline"
+        >
+          Annuler
+        </button>
+      </td>
+    </tr>
   );
 }
