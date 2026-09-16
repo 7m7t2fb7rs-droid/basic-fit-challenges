@@ -3,6 +3,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { rankChallenge, METRIC_LABEL, STATUS_LABEL } from "@/lib/scoring";
+import {
+  fetchCountdownEnd,
+  saveCountdownEnd,
+  DEFAULT_COUNTDOWN_END,
+} from "@/lib/settings";
 
 /* ------------------------------------------------------------------ */
 /*  Page admin : connexion + gestion des défis et des scores          */
@@ -122,6 +127,7 @@ function Dashboard({ email }) {
         <p className="text-neutral-500">Chargement…</p>
       ) : (
         <>
+          <CountdownManager />
           <ScoresManager
             challenges={challenges}
             entries={entries}
@@ -131,6 +137,112 @@ function Dashboard({ email }) {
         </>
       )}
     </div>
+  );
+}
+
+/* ------------- Date de fin du compte à rebours (accueil) ---------- */
+function CountdownManager() {
+  const [date, setDate] = useState("");
+  const [saved, setSaved] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      const v = await fetchCountdownEnd();
+      setDate(v);
+      setSaved(v);
+      setLoading(false);
+    })();
+  }, []);
+
+  const save = async (e) => {
+    e.preventDefault();
+    if (!date) return;
+    setBusy(true);
+    setMsg(null);
+    const { error } = await saveCountdownEnd(date);
+    setBusy(false);
+    if (error) {
+      setMsg({ type: "error", text: error.message });
+      return;
+    }
+    setSaved(date);
+    setMsg({ type: "ok", text: "Date enregistrée ✓" });
+  };
+
+  const formatted = saved
+    ? new Date(`${saved}T12:00:00`).toLocaleDateString("fr-FR", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : "";
+
+  return (
+    <section className="rounded-2xl bg-white p-5 shadow-sm">
+      <h2 className="text-lg font-bold">Compte à rebours</h2>
+      <p className="mb-4 text-sm text-neutral-500">
+        Date de fin affichée sur la page d&apos;accueil. Le décompte s&apos;arrête à
+        23h59 ce jour-là.
+      </p>
+
+      {loading ? (
+        <p className="text-sm text-neutral-400">Chargement…</p>
+      ) : (
+        <>
+          <form onSubmit={save} className="flex flex-wrap items-end gap-2">
+            <label className="text-sm">
+              <span className="mb-1 block text-neutral-500">Date de fin</span>
+              <input
+                type="date"
+                required
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              />
+            </label>
+            <button
+              disabled={busy || date === saved}
+              className="rounded-lg bg-bf-orange px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            >
+              {busy ? "…" : "Enregistrer"}
+            </button>
+            {date !== saved && (
+              <button
+                type="button"
+                onClick={() => setDate(saved)}
+                className="rounded-lg border border-neutral-300 px-3 py-2 text-sm font-semibold hover:bg-neutral-100"
+              >
+                Annuler
+              </button>
+            )}
+          </form>
+
+          <p className="mt-3 text-sm text-neutral-500">
+            Actuellement : <span className="font-semibold text-bf-dark">{formatted}</span>
+          </p>
+          {msg && (
+            <p
+              className={`mt-2 text-sm ${
+                msg.type === "ok" ? "text-green-600" : "text-red-600"
+              }`}
+            >
+              {msg.text}
+              {msg.type === "error" && (
+                <span className="block text-xs text-neutral-500">
+                  Si la table « settings » n&apos;existe pas encore, exécute
+                  supabase-settings.sql dans Supabase. (Valeur par défaut :{" "}
+                  {DEFAULT_COUNTDOWN_END})
+                </span>
+              )}
+            </p>
+          )}
+        </>
+      )}
+    </section>
   );
 }
 

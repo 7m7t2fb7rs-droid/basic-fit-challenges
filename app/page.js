@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { buildLeaderboard, rankChallenge, METRIC_LABEL } from "@/lib/scoring";
-
-const END_DATE = new Date("2026-09-25T23:59:59");
+import { fetchCountdownEnd, endOfDay, DEFAULT_COUNTDOWN_END } from "@/lib/settings";
 
 function useCountdown(target) {
   const calc = () => {
@@ -20,14 +19,16 @@ function useCountdown(target) {
   };
   const [time, setTime] = useState(calc);
   useEffect(() => {
+    setTime(calc());
     const id = setInterval(() => setTime(calc()), 1000);
     return () => clearInterval(id);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target.getTime()]);
   return time;
 }
 
-function Countdown() {
-  const { days, hours, minutes, seconds, done } = useCountdown(END_DATE);
+function Countdown({ endDate }) {
+  const { days, hours, minutes, seconds, done } = useCountdown(endDate);
   if (done) return <p className="mt-3 text-sm font-semibold text-bf-dark">Le classement est terminé !</p>;
   const Cell = ({ v, label }) => (
     <div className="flex flex-col items-center">
@@ -57,10 +58,12 @@ export default function HomePage() {
   const [board, setBoard] = useState([]);
   const [activeChallenges, setActiveChallenges] = useState([]);
   const [byCh, setByCh] = useState({});
+  const [endDate, setEndDate] = useState(DEFAULT_COUNTDOWN_END);
 
   useEffect(() => {
     (async () => {
       try {
+        setEndDate(await fetchCountdownEnd());
         const { data: ch, error: e1 } = await supabase
           .from("challenges")
           .select("*")
@@ -106,7 +109,7 @@ export default function HomePage() {
           Pendant 3 mois, plusieurs défis sont proposés à la salle. Chaque participation rapporte des points et te permet de grimper au classement — le total ici reflète l&apos;ensemble de tes points sur tous les défis.
         </p>
         <div className="flex justify-center mt-3">
-          <Countdown />
+          <Countdown endDate={endOfDay(endDate)} />
         </div>
       </div>
 
