@@ -22,6 +22,10 @@ input, select, textarea { font-size:max(16px,1em); accent-color:var(--orange); }
 .brand-mark { height:34px; width:auto; display:block; flex-shrink:0; }
 .brand-name { font-size:20px; font-weight:900; letter-spacing:-.7px; line-height:1.1; }
 .brand-name>span { display:block; font-size:9px; letter-spacing:2px; margin-top:5px; }
+.gym-status { display:flex; align-items:center; gap:6px; margin-top:6px; font-size:10px; font-weight:700; letter-spacing:0; text-transform:none; color:#8a5a3c; }
+.gym-status.open { color:#3f6330; }
+.gym-dot { width:6px; height:6px; border-radius:50%; background:#c2703f; flex-shrink:0; }
+.gym-status.open .gym-dot { background:#5b8a48; }
 .desktop-nav { display:flex; align-items:center; gap:8px; }
 .nav-link { padding:13px 19px; font-size:13px; font-weight:700; border-radius:6px; }
 .nav-link small { margin-right:10px; font-size:10px; opacity:.55; }
@@ -100,6 +104,26 @@ input, select, textarea { font-size:max(16px,1em); accent-color:var(--orange); }
 .site-footer { max-width:1160px; margin:auto; border-top:1px solid var(--line); padding:25px 0 40px; display:flex; align-items:center; justify-content:space-between; gap:18px; font-size:9px; color:var(--muted); }.footer-brand { font-weight:900; color:var(--ink); letter-spacing:1px; }
 .page-hero { padding:25px 0 35px; border-bottom:1px solid var(--line); }.page-hero>.eyebrow { color:#ad3c0c; }.page-hero h1 { font-size:clamp(48px,7vw,80px); line-height:1.1; margin:15px 0; }.page-hero p:last-child { font-size:13px; color:var(--muted); line-height:1.8; }
 .challenge-page section.rounded-2xl { border:1px solid var(--line); border-radius:8px; box-shadow:none; padding:28px; background:var(--card); }.challenge-page section h2 { font-size:24px; letter-spacing:-.6px; }.challenge-page table th { padding-top:12px; padding-bottom:12px; color:#696d60; font-size:9px; }.challenge-page table td { padding-top:14px; padding-bottom:14px; }.challenge-page .text-neutral-400 { color:#717569; }.challenge-page .bg-white { background:var(--card); }
+/* Onglet Salle : état courant et horaires habituels */
+.gym-now { display:flex; align-items:center; gap:10px; flex-wrap:wrap; border:1px solid var(--line); border-radius:7px; background:var(--surface); padding:14px 16px; }
+.gym-now strong { font-size:15px; font-weight:800; }
+.gym-now .gym-dot { width:9px; height:9px; }
+.gym-now-src { margin-left:auto; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; }
+.gym-now.open { background:#e9f0e2; border-color:#b6cfa8; }
+.gym-override { margin-top:16px; border:1px solid #f0c9a0; background:#fdf2e6; border-radius:7px; padding:16px 18px; }
+.gym-override p { font-size:12px; line-height:1.8; margin-bottom:13px; }
+.gym-actions { display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; margin-top:16px; }
+.gym-hours-title { font-size:14px; font-weight:800; margin:28px 0 6px; padding-top:22px; border-top:1px solid var(--line); }
+.gym-hours { display:flex; flex-direction:column; gap:8px; }
+.gym-day { display:flex; align-items:center; gap:10px; flex-wrap:wrap; border:1px solid var(--line); border-radius:6px; padding:10px 14px; }
+.gym-day-name { font-size:12px; font-weight:700; width:90px; flex-shrink:0; }
+.gym-day input[type=time] { border:1px solid var(--line); border-radius:5px; padding:7px 9px; font:inherit; font-size:13px; background:var(--card); }
+.gym-day-sep { font-size:11px; color:var(--muted); }
+.gym-day-closed { font-size:12px; color:var(--muted); font-style:italic; }
+.gym-day-toggle { margin-left:auto; font-size:11px; font-weight:700; color:var(--muted); }
+.gym-day-toggle:hover { color:var(--ink); text-decoration:underline; }
+@media(max-width:560px) { .gym-day-name { width:100%; } .gym-day-toggle { margin-left:0; } }
+
 /* Espace admin : en-tête, onglets, suggestions */
 .admin-dashboard { display:flex; flex-direction:column; gap:22px; }
 .admin-head { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
@@ -184,7 +208,7 @@ input, select, textarea { font-size:max(16px,1em); accent-color:var(--orange); }
 @media(min-width:1200px) { .hero-copy { padding-top:48px; padding-bottom:42px; } }
 @media(max-width:1000px) { .competition-layout { grid-template-columns:minmax(0,1fr) 275px; gap:22px; }.section-heading { flex-wrap:wrap; }.countdown-panel { display:flex; flex-wrap:wrap; gap:8px 20px; }.countdown-date { flex-basis:100%; }.podium-card { padding:12px; }.site-footer { margin:0 30px; } }
 @media(max-width:760px) { .header-inner { height:80px; padding:0 max(20px, env(safe-area-inset-right)) 0 max(20px, env(safe-area-inset-left)); }.desktop-nav { display:none; }.brand-name { font-size:18px; }.admin-link { font-size:10px; }.site-main { padding:20px max(20px, env(safe-area-inset-right)) 40px max(20px, env(safe-area-inset-left)); }.hero-copy { padding:32px 25px; }.hero .eyebrow { font-size:7px; letter-spacing:1.1px; }.hero h1 { font-size:clamp(40px,8.4vw,58px); margin-top:22px; }.hero-description { max-width:280px; font-size:12px; }.season-strip { grid-template-columns:1fr 1fr; row-gap:23px; padding:24px 0; margin-bottom:30px; }.season-stat:nth-child(2) { border:0; }.season-stat>strong { font-size:38px; }.countdown-panel { grid-column:1/-1; padding:18px 0 0; border-top:1px solid var(--line); display:grid; grid-template-columns:1fr auto; gap:8px; }.countdown { gap:17px; }.competition-layout { grid-template-columns:1fr; gap:36px; }.section-heading { flex-wrap:nowrap; gap:8px; }.section-heading h2 { font-size:27px; }.filter-tabs button { padding:9px 10px; }.challenge-sidebar { display:grid; grid-template-columns:1fr 1fr; gap:16px; }.challenge-sidebar .section-heading { grid-column:1/-1; margin:0; }.challenge-preview { margin:0; }.rules-card { align-self:start; }.site-footer { flex-wrap:wrap; margin:0 20px; padding-bottom:110px; font-size:9px; }.site-footer>span:last-child { display:none; }.mobile-nav { display:flex; position:fixed; z-index:50; bottom:0; left:0; right:0; background:var(--paper); border-top:1px solid var(--line); padding:10px 16px calc(10px + env(safe-area-inset-bottom)); gap:8px; }.mobile-nav a { display:flex; align-items:center; justify-content:center; gap:12px; width:50%; font-size:12px; font-weight:700; padding:15px 10px; border-radius:5px; }.mobile-nav a>span:first-child { font-size:9px; opacity:.65; }.mobile-nav a.active { background:var(--ink); color:#fff; } }
-@media(max-width:430px) { .site-main { padding-left:max(14px, env(safe-area-inset-left)); padding-right:max(14px, env(safe-area-inset-right)); }.header-inner { padding:0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); }.brand-mark { height:28px; }.brand-name { font-size:16px; }.brand-name>span { font-size:7px; }.hero-copy { padding:28px 22px; }.hero h1 { font-size:48px; letter-spacing:-1px; }.section-heading { flex-wrap:wrap; gap:16px; }.section-heading h2 { font-size:29px; }.podium { gap:7px; }.podium-card { padding:11px 9px; }.podium-rank { font-size:10px; }.podium-name { font-size:11px; }.podium-score { font-size:26px; }.leaderboard td,.leaderboard th { padding-left:15px; padding-right:15px; }.challenge-sidebar { grid-template-columns:1fr; }.countdown strong { font-size:26px; }.countdown { gap:13px; }.countdown-date { font-size:8px; }.challenge-page section.rounded-2xl { padding:18px; }.login-panel form { padding:20px; } }
+@media(max-width:430px) { .site-main { padding-left:max(14px, env(safe-area-inset-left)); padding-right:max(14px, env(safe-area-inset-right)); }.header-inner { padding:0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); }.brand-mark { height:28px; }.brand-name { font-size:16px; }.brand-name>span { font-size:7px; }.gym-status { font-size:9px; gap:5px; margin-top:4px; }.hero-copy { padding:28px 22px; }.hero h1 { font-size:48px; letter-spacing:-1px; }.section-heading { flex-wrap:wrap; gap:16px; }.section-heading h2 { font-size:29px; }.podium { gap:7px; }.podium-card { padding:11px 9px; }.podium-rank { font-size:10px; }.podium-name { font-size:11px; }.podium-score { font-size:26px; }.leaderboard td,.leaderboard th { padding-left:15px; padding-right:15px; }.challenge-sidebar { grid-template-columns:1fr; }.countdown strong { font-size:26px; }.countdown { gap:13px; }.countdown-date { font-size:8px; }.challenge-page section.rounded-2xl { padding:18px; }.login-panel form { padding:20px; } }
 @media(prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } *, *::before, *::after { animation:none !important; transition:none !important; } }
 
 /* Application installée sur l'écran d'accueil */

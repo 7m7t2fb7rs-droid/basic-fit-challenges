@@ -16,9 +16,18 @@ import {
 import {
   fetchCountdownEnd,
   saveCountdownEnd,
+  saveSetting,
   DEFAULT_COUNTDOWN_END,
 } from "@/lib/settings";
-import { invalidateData } from "@/lib/store";
+import {
+  DAYS,
+  DEFAULT_HOURS,
+  HOURS_KEY,
+  OVERRIDE_KEY,
+  gymStatus,
+  statusLabel,
+} from "@/lib/gym";
+import { invalidateData, useData } from "@/lib/store";
 
 /* ------------------------------------------------------------------ */
 /*  Page admin : connexion + gestion des défis et des scores          */
@@ -110,6 +119,7 @@ const TABS = [
   { key: "challenges", label: "Défis" },
   { key: "participants", label: "Participants" },
   { key: "suggestions", label: "Suggestions" },
+  { key: "gym", label: "Salle" },
   { key: "countdown", label: "Compte à rebours" },
 ];
 
@@ -208,10 +218,224 @@ function Dashboard({ email }) {
           {tab === "suggestions" && (
             <SuggestionsManager suggestions={suggestions} onChange={reload} />
           )}
+          {tab === "gym" && <GymManager />}
           {tab === "countdown" && <CountdownManager />}
         </>
       )}
     </div>
+  );
+}
+
+/* ------------------------ Ouverture de la salle -------------------- */
+/*  Deux réglages : les horaires habituels, et une exception ponctuelle. */
+/*  L'exception porte son heure de fin — passée celle-ci, l'affichage    */
+/*  revient aux horaires sans que personne n'ait à y repenser.           */
+function GymManager() {
+  const { data, refresh } = useData();
+  const [hours, setHours] = useState(DEFAULT_HOURS);
+  const [until, setUntil] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [now, setNow] = useState(null);
+
+  useEffect(() => {
+    setNow(new Date());
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    if (data?.gymHours) setHours(data.gymHours);
+  }, [data]);
+
+  const override = data?.gymOverride || null;
+  const status = data && now ? gymStatus(data.gymHours, override, now) : null;
+
+  const write = async (key, value, texte) => {
+    setBusy(true);
+    setMsg(null);
+    const { error } = await saveSetting(key, value);
+    if (error) {
+      setBusy(false);
+      setMsg({ type: "error", text: error.message });
+      return;
+    }
+    await refresh();
+    setBusy(false);
+    setMsg({ type: "ok", text: texte });
+  };
+
+  const close = () => {
+    if (!until) {
+      write(OVERRIDE_KEY, JSON.stringify({ state: "closed", until: null }), "Salle marquée fermée.");
+      return;
+    }
+    // <input type="datetime-local"> rend une heure locale sans fuseau ; on la
+    // convertit en instant absolu pour que l'expiration soit sans ambiguïté.
+    const d = new Date(until);
+    if (Number.isNaN(d.getTime())) {
+      setMsg({ type: "error", text: "Heure de réouverture invalide." });
+      return;
+    }
+    write(
+      OVERRIDE_KEY,
+      JSON.stringify({ state: "closed", until: d.toISOString() }),
+      "Salle fermée jusqu’à l’heure indiquée."
+    );
+  };
+
+  const saveHours = () => {
+    const clean = {};
+    for (const { key } of DAYS) clean[key] = hours[key] || null;
+    write(HOURS_KEY, JSON.stringify(clean), "Horaires enregistrés.");
+  };
+
+  const setDay = (key, index, value) => {
+    setHours((h) => {
+      const slot = h[key] || ["09:00", "19:00"];
+      const next = [...slot];
+      next[index] = value;
+      return { ...h, [key]: next };
+    });
+  };
+
+  const toggleDay = (key) => {
+    setHours((h) => ({ ...h, [key]: h[key] ? null : DEFAULT_HOURS[key] }));
+  };
+
+  return (
+    <section className="rounded-2xl bg-white p-5 shadow-sm">
+      <h2 className="text-lg font-bold">Ouverture de la salle</h2>
+      <p className="mb-4 text-sm text-neutral-500">
+        L’état affiché en haut du site se calcule tout seul à partir des horaires
+        ci-dessous. Tu n’interviens que pour une exception — fermeture
+        exceptionnelle, jour férié, travaux.
+      </p>
+
+      <div className={status?.open ? "gym-now open" : "gym-now"}>
+        <span className="gym-dot" aria-hidden="true" />
+        <strong>{status ? statusLabel(status, now) : "…"}</strong>
+        <span className="gym-now-src">
+          {status?.forced ? "exception en cours" : "d’après les horaires"}
+        </span>
+      </div>
+
+      {override ? (
+        <div className="gym-override">
+          <p>
+            Une exception est active : la salle est marquée{" "}
+            <strong>{override.state === "open" ? "ouverte" : "fermée"}</strong>
+            {override.until && (
+              <>
+                {" "}
+                jusqu’au{" "}
+                <strong>
+                  {new Date(override.until).toLocaleString("fr-FR", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </strong>
+              </>
+            )}
+            .
+          </p>
+          <button
+            type="button"
+            disabled={busy}
+            className="rounded-lg bg-bf-orange px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            onClick={() => write(OVERRIDE_KEY, "", "Retour aux horaires habituels.")}
+          >
+            Revenir aux horaires habituels
+          </button>
+        </div>
+      ) : (
+        <div className="gym-actions">
+          <label className="text-sm">
+            <span className="mb-1 block text-neutral-500">
+              Réouverture prévue <span className="text-neutral-400">(facultatif)</span>
+            </span>
+            <input
+              type="datetime-local"
+              value={until}
+              onChange={(e) => setUntil(e.target.value)}
+              className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={close}
+            className="rounded-lg bg-bf-orange px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            Marquer la salle fermée
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              write(
+                OVERRIDE_KEY,
+                JSON.stringify({ state: "open", until: null }),
+                "Salle marquée ouverte."
+              )
+            }
+            className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-semibold hover:bg-neutral-100"
+          >
+            Marquer la salle ouverte
+          </button>
+        </div>
+      )}
+
+      {msg && (
+        <p className={`mt-3 text-sm ${msg.type === "ok" ? "text-green-600" : "text-red-600"}`}>
+          {msg.text}
+        </p>
+      )}
+
+      <h3 className="gym-hours-title">Horaires habituels</h3>
+      <p className="mb-3 text-sm text-neutral-500">
+        Relevés sur le site de Basic-Fit pour le club de Saint-Claude. Corrige-les
+        s’ils ont changé — c’est ce tableau qui pilote l’affichage.
+      </p>
+      <div className="gym-hours">
+        {DAYS.map(({ key, long }) => (
+          <div key={key} className="gym-day">
+            <span className="gym-day-name">{long}</span>
+            {hours[key] ? (
+              <>
+                <input
+                  type="time"
+                  value={hours[key][0]}
+                  onChange={(e) => setDay(key, 0, e.target.value)}
+                />
+                <span className="gym-day-sep">à</span>
+                <input
+                  type="time"
+                  value={hours[key][1]}
+                  onChange={(e) => setDay(key, 1, e.target.value)}
+                />
+              </>
+            ) : (
+              <span className="gym-day-closed">Fermé toute la journée</span>
+            )}
+            <button type="button" className="gym-day-toggle" onClick={() => toggleDay(key)}>
+              {hours[key] ? "Fermer ce jour" : "Rouvrir ce jour"}
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={saveHours}
+        disabled={busy}
+        className="mt-4 rounded-lg bg-bf-orange px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      >
+        {busy ? "…" : "Enregistrer les horaires"}
+      </button>
+    </section>
   );
 }
 
