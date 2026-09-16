@@ -11,8 +11,6 @@ import {
   attachParticipants,
 } from "@/lib/scoring";
 
-const MEDAL = ["🥇", "🥈", "🥉"];
-
 function StatusBadge({ status }) {
   const styles = {
     upcoming: "bg-neutral-100 text-neutral-600",
@@ -93,11 +91,12 @@ export default function DefisPage() {
     .sort(bySoonestFirst);
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-extrabold tracking-tight">Les défis</h1>
+    <div className="challenge-page space-y-8">
+      <div className="page-hero">
+        <p className="eyebrow">LE TERRAIN DE JEU DU CLUB / 02</p>
+        <h1>RELÈVE LE DÉFI<span className="orange-period">.</span></h1>
         <p className="text-sm text-neutral-500">
-          Résultats des défis en cours et terminés, et ce qui arrive.
+          Trouve ton prochain challenge. Découvre les performances du club et les records à dépasser.
         </p>
       </div>
 
@@ -142,7 +141,7 @@ export default function DefisPage() {
                     {ranked.map((r) => (
                       <tr key={r.id} className="border-t border-neutral-100">
                         <td className="px-2 py-1.5 font-bold text-neutral-500">
-                          {r.rank <= 3 ? MEDAL[r.rank - 1] : r.rank}
+                          <span className={r.rank <= 3 ? "rank-number top-rank" : "rank-number"}>{String(r.rank).padStart(2, "0")}</span>
                         </td>
                         <td className="px-2 py-1.5 font-semibold">
                           {displayName(r.participant)}

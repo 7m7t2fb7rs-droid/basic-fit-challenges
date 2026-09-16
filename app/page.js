@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import {
@@ -38,56 +39,20 @@ function useCountdown(target) {
 
 function Countdown({ endDate }) {
   const { days, hours, minutes, seconds, done } = useCountdown(endDate);
-  if (done) return <p className="mt-3 text-sm font-semibold text-bf-dark">Le classement est terminé !</p>;
-  const Cell = ({ v, label }) => (
-    <div className="flex flex-col items-center">
-      <span className="text-2xl font-extrabold text-bf-dark leading-none">{String(v).padStart(2, "0")}</span>
-      <span className="text-[10px] uppercase tracking-wide text-neutral-400 mt-0.5">{label}</span>
-    </div>
-  );
-  const Sep = () => <span className="text-xl font-bold text-bf-orange pb-3">:</span>;
-  return (
-    <div className="inline-flex items-end gap-2 rounded-xl bg-bf-light px-4 py-2">
-      <Cell v={days} label="jours" />
-      <Sep />
-      <Cell v={hours} label="heures" />
-      <Sep />
-      <Cell v={minutes} label="min" />
-      <Sep />
-      <Cell v={seconds} label="sec" />
-    </div>
-  );
+  return <div className="countdown-panel">
+    <span className="eyebrow">{done ? "Saison terminée" : "Le chrono tourne"}</span>
+    {done ? <p className="countdown-done">Bravo à tous les participants.</p> :
+      <div className="countdown">{[[days,"jours"],[hours,"heures"],[minutes,"min"],[seconds,"sec"]].map(([v,label]) =>
+        <div key={label}><strong>{String(v).padStart(2,"0")}</strong><span>{label}</span></div>)}</div>}
+    <span className="countdown-date">Fin du classement · {endDate.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</span>
+  </div>;
 }
 
-const MEDAL = ["🥇", "🥈", "🥉"];
-
-const FILTERS = [
-  { key: "all", label: "All" },
-  { key: "H", label: "H" },
-  { key: "F", label: "F" },
-];
-
 function GenderFilter({ value, onChange }) {
-  return (
-    <div className="inline-flex shrink-0 rounded-xl bg-bf-light p-0.5">
-      {FILTERS.map(({ key, label }) => (
-        <button
-          key={key}
-          type="button"
-          onClick={() => onChange(key)}
-          aria-pressed={value === key}
-          title={key === "all" ? "Tout le monde" : GENDER_LABEL[key]}
-          className={`rounded-lg px-3 py-1 text-xs font-extrabold transition ${
-            value === key
-              ? "bg-bf-orange text-white shadow-sm"
-              : "text-neutral-500 hover:text-bf-dark"
-          }`}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
+  return <div className="filter-tabs" aria-label="Catégorie du classement">
+    {[["all","Tous"],["H","Hommes"],["F","Femmes"]].map(([key,label]) =>
+      <button key={key} type="button" onClick={() => onChange(key)} aria-pressed={value === key}>{label}</button>)}
+  </div>;
 }
 
 export default function HomePage() {
@@ -141,152 +106,47 @@ export default function HomePage() {
     })();
   }, []);
 
-  if (loading) return <p className="text-neutral-500">Chargement du classement…</p>;
-  if (error)
-    return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-        {error}
-        <p className="mt-2 text-red-500">
-          Vérifie que la base Supabase est configurée (voir README).
-        </p>
-      </div>
-    );
-
   return (
-    <div className="space-y-8">
-      <div>
-        <div className="flex items-start gap-3">
-          <h1 className="text-2xl font-extrabold tracking-tight">Classement général</h1>
-          <div className="ml-auto">
-            <GenderFilter value={filter} onChange={setFilter} />
-          </div>
+    <div className="home-page">
+      <section className="hero">
+        <div className="hero-copy">
+          <p className="eyebrow"><span className="signal-dot" /> LE CHALLENGE COMMENCE AVEC TOI</p>
+          <h1>ACCROCHE-TOI.<br /><span>DÉPASSE-TOI.</span></h1>
+          <p className="hero-description">Une salle, des défis et l’envie d’aller plus loin.<br className="desktop-break" /> Donne le meilleur. Fais grimper ton score.</p>
+          <Link className="primary-link" href="/defis">Découvrir les défis <span aria-hidden="true">↗</span></Link>
         </div>
-        <p className="mt-2 text-sm text-neutral-500">
-          Pendant 3 mois, plusieurs défis sont proposés à la salle. Chaque participation rapporte des points et te permet de grimper au classement — le total ici reflète l&apos;ensemble de tes points sur tous les défis.
-        </p>
-        <div className="flex justify-center mt-3">
-          <Countdown endDate={endOfDay(endDate)} />
-        </div>
+        <div className="hero-art" aria-hidden="true"><div className="track track-one" /><div className="track track-two" /><div className="track track-three" /><span className="hero-arrow">↗</span><span className="art-caption">PLUS FORT À CHAQUE DÉFI.</span></div>
+        <div className="hero-bottom"><span>TON EFFORT. TES POINTS. TA PLACE.</span><span>CHALLENGES / BASIC FIT</span></div>
+      </section>
+
+      <div className="season-strip">
+        <div className="season-stat"><strong>{loading ? "—" : participants.length}</strong><span>participants<br />dans le club</span></div>
+        <div className="season-stat"><strong>{loading ? "—" : counting.length.toString().padStart(2,"0")}</strong><span>défis comptabilisés<br />au classement</span></div>
+        {!loading && !error ? <Countdown endDate={endOfDay(endDate)} /> : <div className="countdown-panel"><span className="eyebrow">CHAQUE EFFORT COMPTE</span><p>Prêt à te dépasser ?</p></div>}
       </div>
 
-      {board.length === 0 ? (
-        <div className="rounded-xl bg-white p-6 text-neutral-500 shadow-sm">
-          {filter === "all" ? (
-            <p>Aucun score pour l&apos;instant. Reviens après le premier défi !</p>
-          ) : (
+      <div className="competition-layout">
+        <section className="ranking-section" aria-labelledby="ranking-title">
+          <div className="section-heading"><div><p className="eyebrow">LE TABLEAU DES PERFORMANCES</p><h2 id="ranking-title">Le classement<span className="orange-period">.</span></h2></div><GenderFilter value={filter} onChange={setFilter} /></div>
+          <p className="section-intro">Tous tes points, tous tes défis. Une place à aller chercher.</p>
+          {loading ? <div className="empty-state" role="status">Chargement du classement…</div> :
+            error ? <div className="empty-state error-state" role="alert"><h3>Le classement est momentanément indisponible.</h3><p>Réessaie dans quelques instants.</p><button className="primary-link" onClick={() => window.location.reload()}>Réessayer ↗</button></div> :
+            board.length === 0 ? <div className="empty-state"><span className="empty-number">01</span><h3>La première place t’attend.</h3><p>{filter === "all" ? "Aucun score pour l’instant. Rendez-vous à la salle pour le premier défi !" : `Aucun participant dans la catégorie ${GENDER_LABEL[filter]}.`}</p>{filter !== "all" && !hasGenderData && <p>Les catégories des participants n’ont pas encore été renseignées.</p>}<Link href="/defis" className="text-link">Voir les défis ↗</Link></div> :
             <>
-              <p>
-                Aucun participant dans la catégorie{" "}
-                <span className="font-semibold">{GENDER_LABEL[filter]}</span>.
-              </p>
-              {!hasGenderData && (
-                <p className="mt-1 text-sm text-neutral-400">
-                  Le genre n&apos;a encore été renseigné sur aucune fiche
-                  participant — il se saisit depuis l&apos;espace admin.
-                </p>
-              )}
-            </>
-          )}
-        </div>
-      ) : (
-        <>
-          {/* Podium — horizontal même sur mobile, compact */}
-          <div className="grid grid-cols-3 gap-2">
-            {board.slice(0, 3).map((p, i) => (
-              <div
-                key={p.id}
-                className={`rounded-2xl px-2 py-3 text-center shadow-sm ${
-                  i === 0
-                    ? "bg-gradient-to-b from-amber-100 to-white ring-2 ring-amber-300"
-                    : "bg-white"
-                }`}
-              >
-                <div className="text-2xl">{MEDAL[i]}</div>
-                <div className="mt-1 text-sm font-bold leading-tight truncate">{p.name}</div>
-                <div className="text-bf-dark font-extrabold text-xl">{p.total}</div>
-                <div className="text-xs uppercase tracking-wide text-neutral-400">pts</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Tableau complet — sans colonne par défi */}
-          <div className="overflow-x-auto rounded-2xl bg-white shadow-sm">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-bf-orange text-white">
-                  <th className="px-3 py-2 text-left">#</th>
-                  <th className="px-3 py-2 text-left">Nom</th>
-                  <th className="px-3 py-2 text-center">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {board.map((p) => (
-                  <tr key={p.id} className="border-t border-neutral-100">
-                    <td className="px-3 py-2 font-bold text-neutral-500">{p.rank}</td>
-                    <td className="px-3 py-2 font-semibold">{p.name}</td>
-                    <td className="text-bf-dark px-3 py-2 text-center font-extrabold">
-                      {p.total}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-
-      {/* Séparateur orange + titre défi en cours */}
-      {activeChallenges.length > 0 && (
-        <div className="border-t-4 border-bf-orange pt-6">
-          <h2 className="text-lg font-extrabold tracking-tight">Défi en cours</h2>
-          <p className="mt-1 text-sm text-neutral-500">
-            Participe avant la fin et grimpe au classement général.
-          </p>
-        </div>
-      )}
-
-      {/* Défi en cours */}
-      {activeChallenges.length > 0 && (
-        <div className="space-y-3">
-          {activeChallenges.map((ch) => {
-            const ranked = rankChallenge(byCh[ch.id] || [], ch.metric);
-            return (
-              <div key={ch.id} className="rounded-2xl bg-white p-5 shadow-sm">
-                <div className="flex items-start gap-2 mb-3">
-                  <span className="inline-block mt-1.5 h-2 w-2 shrink-0 rounded-full bg-green-400 animate-pulse" />
-                  <div>
-                    <h2 className="font-bold text-lg leading-tight">{ch.name}</h2>
-                    <span className="text-xs text-green-600 font-semibold">En cours</span>
-                  </div>
-                  <span className="ml-auto text-xs text-neutral-400 uppercase tracking-wide">
-                    {METRIC_LABEL[ch.metric]}
-                  </span>
-                </div>
-                {ch.description && (
-                  <p className="mb-3 text-sm text-neutral-500">{ch.description}</p>
-                )}
-                {ranked.length === 0 ? (
-                  <p className="text-sm text-neutral-400">Aucun score pour l&apos;instant — sois le premier !</p>
-                ) : (
-                  <div className="space-y-1">
-                    {ranked.slice(0, 5).map((r) => (
-                      <div key={r.id} className="flex items-center gap-2 text-sm">
-                        <span className="w-5 text-center font-bold text-neutral-400">{r.rank}</span>
-                        <span className="flex-1 font-semibold">{displayName(r.participant)}</span>
-                        <span className="text-neutral-500">{r.raw_value}</span>
-                        <span className="w-10 text-right font-extrabold text-bf-dark">{r.points} pts</span>
-                      </div>
-                    ))}
-                    {ranked.length > 5 && (
-                      <p className="text-xs text-neutral-400 pt-1">+{ranked.length - 5} autres participants</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+              <div className="podium">{board.slice(0,3).map((p,i) => <article key={p.id} className={`podium-card podium-${i+1}`}><div className="podium-top"><span className="eyebrow">{i === 0 ? "EN TÊTE" : "SUR LE PODIUM"}</span><span className="podium-rank">0{p.rank}</span></div><span className="athlete-avatar" aria-hidden="true">{p.name.split(" ").filter(Boolean).map(n=>n[0]).slice(0,2).join("")}</span><h3>{p.name}</h3><p className="podium-score">{p.total}<span> pts</span></p></article>)}</div>
+              <div className="leaderboard"><div className="table-caption"><h3>Classement général</h3><span>{board.length} participant{board.length > 1 ? "s" : ""}</span></div><table><caption className="sr-only">Classement général — {filter === "all" ? "Tous" : GENDER_LABEL[filter]}</caption><thead><tr><th scope="col">Rang</th><th scope="col">Participant</th><th scope="col">Points</th></tr></thead><tbody>{board.map(p => <tr key={p.id}><td><span className={p.rank <= 3 ? "rank-number top-rank" : "rank-number"}>{String(p.rank).padStart(2,"0")}</span></td><td>{p.name}</td><td>{p.total}<span className="points-label"> pts</span></td></tr>)}</tbody></table></div>
+            </>}
+        </section>
+        <aside className="challenge-sidebar">
+          <div className="section-heading"><div><p className="eyebrow">À TOI DE JOUER</p><h2>Dans l’arène<span className="orange-period">.</span></h2></div></div>
+          {loading ? <div className="challenge-preview" role="status">Chargement des défis…</div> : activeChallenges.length ? activeChallenges.map(ch => {
+            const ranked = rankChallenge(byCh[ch.id] || [],ch.metric);
+            return <article key={ch.id} className="challenge-preview"><div className="challenge-meta"><span className="live-badge"><span className="signal-dot" /> EN COURS</span><span>{METRIC_LABEL[ch.metric]}</span></div><h3>{ch.name}</h3>{ch.description && <p>{ch.description}</p>}<div className="mini-ranking">{ranked.slice(0,3).map(r => <div key={r.id}><span className="mini-rank">{r.rank}</span><strong>{displayName(r.participant)}</strong><span>{r.raw_value}</span></div>)}</div>{ranked.length === 0 && <p>Sois le premier à poser ton score.</p>}<Link className="text-link" href="/defis">Voir les résultats <span aria-hidden="true">↗</span></Link></article>;
+          }) : <div className="challenge-preview"><h3>{error ? "Retrouve les défis" : "La suite se prépare."}</h3><p>{error ? "Consulte les épreuves et leurs résultats." : "Découvre les résultats et les prochains rendez-vous du club."}</p><Link className="text-link" href="/defis">Explorer les défis ↗</Link></div>}
+          <div className="rules-card"><span className="eyebrow">LE JEU EST SIMPLE</span><h3>Chaque défi.<br />Une nouvelle chance.</h3><p>Le barème F1 récompense les 10 premiers de chaque défi. Les points s’additionnent au classement général.</p><div className="points-podium"><span>1er <strong>25 pts</strong></span><span>2e <strong>18 pts</strong></span><span>3e <strong>15 pts</strong></span></div><p className="rules-footnote">Puis 12, 10, 8, 6, 4, 2 et 1 point.</p></div>
+        </aside>
+      </div>
+      <div className="closing-line"><span>LA PROCHAINE PERFORMANCE,</span><span>C’EST LA TIENNE. ↗</span></div>
     </div>
   );
 }

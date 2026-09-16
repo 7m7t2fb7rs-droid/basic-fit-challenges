@@ -59,13 +59,17 @@ function LoginForm() {
   };
 
   return (
-    <div className="mx-auto max-w-sm">
+    <div className="login-panel">
+      <p className="eyebrow">DANS LES COULISSES DU CLUB</p>
       <h1 className="text-2xl font-extrabold tracking-tight">Espace admin</h1>
       <p className="mb-4 text-sm text-neutral-500">
         Connecte-toi pour gérer les défis et saisir les scores.
       </p>
       <form onSubmit={submit} className="space-y-3 rounded-2xl bg-white p-5 shadow-sm">
+        <label htmlFor="admin-email">Adresse e-mail</label>
         <input
+          id="admin-email"
+          autoComplete="username"
           type="email"
           required
           placeholder="Email"
@@ -73,7 +77,10 @@ function LoginForm() {
           onChange={(e) => setEmail(e.target.value)}
           className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
         />
+        <label htmlFor="admin-password">Mot de passe</label>
         <input
+          id="admin-password"
+          autoComplete="current-password"
           type="password"
           required
           placeholder="Mot de passe"
@@ -90,7 +97,7 @@ function LoginForm() {
         </button>
       </form>
       <p className="mt-3 text-xs text-neutral-400">
-        Les comptes admin se créent dans Supabase (Authentication → Users → Add user).
+        Accès réservé à l’équipe qui organise les challenges.
       </p>
     </div>
   );
@@ -125,7 +132,7 @@ function Dashboard({ email }) {
   }, [reload]);
 
   return (
-    <div className="space-y-8">
+    <div className="admin-dashboard space-y-8">
       <div className="flex items-center">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Espace admin</h1>

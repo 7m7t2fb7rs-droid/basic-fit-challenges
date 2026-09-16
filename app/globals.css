@@ -2,14 +2,114 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: light;
-}
-
-body {
-  @apply bg-neutral-50 text-neutral-900 antialiased;
-}
-
-input, select, textarea {
-  font-size: max(16px, 1em);
-}
+:root { color-scheme: light; --paper:#f5f3ed; --ink:#24251f; --muted:#6c6e62; --orange:#ff641f; --line:#dfdfd5; }
+* { box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body { margin:0; background:var(--paper); color:var(--ink); font-family:Arial, Helvetica, sans-serif; -webkit-font-smoothing:antialiased; }
+::selection { background:var(--orange); color:#fff; }
+a, button, input, select, textarea { -webkit-tap-highlight-color:transparent; }
+button, a { touch-action:manipulation; }
+button { cursor:pointer; }
+input, select, textarea { font-size:max(16px,1em); accent-color:var(--orange); }
+:focus-visible { outline:3px solid #bc420d; outline-offset:5px; }
+.skip-link { position:fixed; top:-80px; left:20px; padding:15px; background:white; z-index:100; }
+.skip-link:focus { top:12px; }
+.site-header { border-bottom:1px solid var(--line); background:var(--paper); }
+.header-inner { max-width:1220px; height:98px; margin:auto; padding:0 30px; display:flex; align-items:center; justify-content:space-between; gap:24px; }
+.brand { display:flex; align-items:center; gap:11px; }
+.brand-mark { background:var(--orange); width:44px; height:44px; border-radius:50%; display:grid; place-items:center; font-size:34px; font-weight:900; letter-spacing:-5px; padding-right:5px; padding-bottom:4px; }
+.brand-name { font-size:20px; font-weight:900; letter-spacing:-.7px; line-height:1.1; }
+.brand-name>span { display:block; font-size:9px; letter-spacing:2px; margin-top:5px; }
+.desktop-nav { display:flex; align-items:center; gap:8px; }
+.nav-link { padding:13px 19px; font-size:13px; font-weight:700; border-radius:6px; }
+.nav-link small { margin-right:10px; font-size:10px; opacity:.55; }
+.nav-link.active { background:var(--ink); color:#fff; }
+.nav-link:not(.active):hover { background:#e9e7df; }
+.admin-link { font-size:11px; font-weight:700; color:#626456; }
+.admin-link span { margin-left:15px; font-size:18px; }
+.mobile-nav { display:none; }
+.site-main { max-width:1220px; margin:auto; padding:32px 30px 65px; min-height:75vh; }
+.hero { position:relative; background:var(--ink); border-radius:10px; overflow:hidden; color:var(--paper); }
+.hero-copy { position:relative; padding:42px 42px 38px; z-index:1; width:70%; }
+.eyebrow { font-size:9px; font-weight:800; letter-spacing:1.7px; text-transform:uppercase; line-height:1.6; }
+.hero .eyebrow { color:#d7d7ca; display:flex; align-items:center; gap:9px; }
+.signal-dot { display:inline-block; height:6px; width:6px; border-radius:50%; background:var(--orange); flex-shrink:0; }
+.hero h1, .page-hero h1, .closing-line, .podium-score, .countdown strong, .season-stat>strong { font-family:Impact,'Arial Narrow',sans-serif; font-weight:400; }
+.hero h1 { font-size:clamp(46px,6.7vw,82px); letter-spacing:-1px; line-height:1.02; margin:22px 0; }
+.hero h1>span { color:var(--orange); }
+.hero-description { font-size:13px; color:#cccfc2; line-height:1.8; }
+.primary-link { display:inline-flex; justify-content:space-between; align-items:center; gap:35px; padding:14px 19px; background:var(--orange); color:#211d17; font-size:12px; font-weight:800; border-radius:4px; margin-top:24px; transition:background .2s, transform .2s; }
+.primary-link:hover { background:#ff8149; transform:translateY(-2px); }
+.primary-link>span { font-size:20px; line-height:1; }
+.hero-art { position:absolute; width:340px; height:360px; top:25px; right:22px; }
+.track { position:absolute; border:1px solid #838573; border-radius:180px; width:230px; height:410px; transform:rotate(34deg); opacity:.45; }
+.track-one { right:0; top:-80px; }.track-two { right:40px; top:-65px; }.track-three { right:80px; top:-50px; }
+.hero-arrow { position:absolute; right:34px; top:12px; color:var(--orange); font-size:240px; font-family:Arial,sans-serif; line-height:1.2; font-weight:900; transform:rotate(-5deg); }
+.art-caption { position:absolute; bottom:25px; right:25px; font-size:8px; letter-spacing:3px; color:#b6b8a9; }
+.hero-bottom { border-top:1px solid #494b40; display:flex; justify-content:space-between; padding:15px 42px; font-size:8px; letter-spacing:1.8px; color:#bfc1b5; }
+.season-strip { display:grid; grid-template-columns:1fr 1fr 1.8fr; align-items:center; padding:26px 0; border-bottom:1px solid var(--line); margin-bottom:42px; }
+.season-stat { display:flex; align-items:center; gap:14px; padding-left:24px; border-right:1px solid var(--line); }
+.season-stat:first-child { padding-left:0; }
+.season-stat>strong { font-size:42px; line-height:1; }
+.season-stat>span { font-size:11px; line-height:1.5; color:var(--muted); }
+.countdown-panel { display:grid; grid-template-columns:1fr auto; padding-left:30px; align-items:center; gap:5px 18px; }
+.countdown-panel>.eyebrow { color:var(--muted); font-size:8px; }
+.countdown { display:flex; gap:18px; grid-row:span 2; }
+.countdown>div { display:flex; flex-direction:column; align-items:center; }
+.countdown strong { font-size:30px; font-variant-numeric:tabular-nums; line-height:1; }
+.countdown span { font-size:8px; color:var(--muted); margin-top:5px; text-transform:uppercase; }
+.countdown-date { font-size:9px; color:var(--muted); }
+.countdown-done { font-size:12px; font-weight:700; }
+.competition-layout { display:grid; grid-template-columns:minmax(0,1fr) 310px; gap:34px; }
+.section-heading { display:flex; justify-content:space-between; gap:15px; align-items:center; }
+.section-heading .eyebrow { color:var(--muted); font-size:8px; margin-bottom:5px; }
+.section-heading h2 { font-size:28px; font-weight:800; letter-spacing:-1.2px; line-height:1.2; }
+.orange-period { color:var(--orange); }
+.section-intro { margin:10px 0 22px; color:var(--muted); font-size:11px; line-height:1.6; }
+.filter-tabs { display:flex; padding:3px; background:#e8e7df; border-radius:5px; flex-shrink:0; }
+.filter-tabs button { padding:10px 12px; font-size:10px; font-weight:700; border-radius:3px; min-height:36px; }
+.filter-tabs button[aria-pressed=true] { background:var(--ink); color:#fff; }
+.filter-tabs button:hover { box-shadow:inset 0 0 0 1px #aaa; }
+.podium { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-bottom:25px; }
+.podium-card { position:relative; border:1px solid var(--line); border-radius:7px; padding:15px 17px 18px; background:#eeeee6; overflow:hidden; }
+.podium-1 { background:#ffe3d3; border-color:#ffb592; }
+.podium-top { display:flex; justify-content:space-between; align-items:center; gap:4px; }
+.podium-top .eyebrow { font-size:7px; letter-spacing:1px; color:#5d6053; }
+.podium-rank { font-size:18px; font-weight:800; color:#67695b; }
+.podium-1 .podium-rank { color:#b63809; }
+.athlete-avatar { display:grid; place-items:center; width:39px; height:39px; border:1px solid #cdcec0; border-radius:50%; font-size:12px; font-weight:800; margin:20px 0 12px; background:#e2e3d8; }
+.podium-1 .athlete-avatar { background:var(--orange); border-color:var(--orange); }
+.podium-card h3 { font-size:13px; font-weight:800; line-height:1.4; overflow-wrap:anywhere; }
+.podium-score { font-size:34px; margin-top:5px; line-height:1.2; }
+.podium-score span { font:10px Arial,sans-serif; color:#636451; }
+.leaderboard { background:#fffefa; border:1px solid var(--line); border-radius:7px; overflow:hidden; }
+.table-caption { display:flex; align-items:center; justify-content:space-between; padding:18px 20px; }
+.table-caption h3 { font-size:12px; font-weight:800; }.table-caption>span { font-size:9px; color:var(--muted); }
+.leaderboard table { width:100%; border-collapse:collapse; font-size:12px; }
+.leaderboard th { text-align:left; background:#edeee6; text-transform:uppercase; font-size:8px; letter-spacing:1.3px; color:var(--muted); padding:12px 20px; }
+.leaderboard td { padding:15px 20px; border-top:1px solid #eeeee7; font-weight:700; }
+.leaderboard td:first-child { width:70px; }
+.leaderboard td:last-child,.leaderboard th:last-child { text-align:right; }
+.leaderboard td:last-child { font-size:16px; }.points-label { font-weight:400; font-size:9px; color:var(--muted); }
+.leaderboard tbody tr:hover { background:#f8f7f1; }
+.rank-number { color:#777b69; font-size:11px; }.top-rank { color:#b34211; }
+.challenge-sidebar .section-heading { margin-bottom:22px; }.challenge-sidebar h2 { font-size:25px; }
+.challenge-preview { border:1px solid var(--line); border-radius:7px; background:#fffefa; padding:23px; margin-bottom:16px; }
+.challenge-meta { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:8px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); }
+.live-badge { display:inline-flex; align-items:center; gap:5px; color:#45633d; font-size:8px; font-weight:800; }.live-badge .signal-dot { background:#527448; }
+.challenge-preview h3 { font-size:23px; letter-spacing:-.7px; line-height:1.15; font-weight:800; margin:20px 0 10px; }
+.challenge-preview p,.rules-card p { font-size:11px; line-height:1.8; color:var(--muted); }
+.mini-ranking { margin-top:18px; }.mini-ranking>div { display:flex; align-items:center; gap:10px; font-size:10px; padding:10px 0; border-bottom:1px solid var(--line); }.mini-ranking strong { flex:1; }.mini-rank { color:var(--muted); }
+.text-link { display:flex; justify-content:space-between; font-size:11px; font-weight:800; margin-top:20px; gap:15px; }.text-link:hover { color:#b6420c; }
+.rules-card { background:#e7e9dd; padding:24px; border-radius:7px; }.rules-card>.eyebrow { color:#636953; font-size:8px; }.rules-card h3 { font-size:24px; line-height:1.15; font-weight:800; letter-spacing:-.8px; margin:16px 0; }.points-podium { display:flex; justify-content:space-between; padding:16px 0 10px; margin-top:13px; border-top:1px solid #cdd1bf; }.points-podium>span { display:flex; flex-direction:column; gap:4px; font-size:9px; color:#636953; }.points-podium strong { color:var(--ink); font-size:16px; }.rules-card .rules-footnote { font-size:9px; }
+.empty-state { border:1px solid var(--line); background:#fffefa; border-radius:7px; padding:35px; margin-top:20px; font-size:13px; }.empty-state h3 { font-size:23px; font-weight:800; margin:12px 0; }.empty-state p { font-size:12px; color:var(--muted); line-height:1.8; }.empty-number { font-family:Impact,sans-serif; font-size:50px; color:var(--orange); }.error-state { border-color:#f2b49a; }
+.closing-line { display:flex; justify-content:space-between; font-size:clamp(20px,2.8vw,34px); line-height:1.2; gap:20px; border-top:1px solid var(--line); padding-top:32px; margin-top:52px; }.closing-line>span:last-child { color:#b64112; }
+.site-footer { max-width:1160px; margin:auto; border-top:1px solid var(--line); padding:25px 0 40px; display:flex; align-items:center; justify-content:space-between; gap:18px; font-size:9px; color:var(--muted); }.footer-brand { font-weight:900; color:var(--ink); letter-spacing:1px; }
+.page-hero { padding:25px 0 35px; border-bottom:1px solid var(--line); }.page-hero>.eyebrow { color:#ad3c0c; }.page-hero h1 { font-size:clamp(48px,7vw,80px); line-height:1.1; margin:15px 0; }.page-hero p:last-child { font-size:13px; color:var(--muted); line-height:1.8; }
+.challenge-page section.rounded-2xl { border:1px solid var(--line); border-radius:8px; box-shadow:none; padding:28px; background:#fffefa; }.challenge-page section h2 { font-size:24px; letter-spacing:-.6px; }.challenge-page table th { padding-top:12px; padding-bottom:12px; color:#696d60; font-size:9px; }.challenge-page table td { padding-top:14px; padding-bottom:14px; }.challenge-page .text-neutral-400 { color:#717569; }.challenge-page .bg-white { background:#fffefa; }
+.login-panel { max-width:450px; margin:35px auto 60px; }.login-panel h1 { font-size:40px; letter-spacing:-1.5px; margin:13px 0; }.login-panel form { margin-top:25px; padding:28px; border:1px solid var(--line); box-shadow:none; border-radius:8px; }.login-panel label { display:block; font-size:11px; font-weight:700; padding:9px 0 6px; }.login-panel input { min-height:47px; background:#fafaf5; }.login-panel button { min-height:48px; }.admin-dashboard section { border:1px solid var(--line); box-shadow:none; }.admin-dashboard h1 { font-size:36px; letter-spacing:-1px; }.admin-dashboard input,.admin-dashboard select { min-height:42px; }
+@media(min-width:1200px) { .hero-copy { padding-top:48px; padding-bottom:42px; } }
+@media(max-width:1000px) { .competition-layout { grid-template-columns:minmax(0,1fr) 275px; gap:22px; }.section-heading { flex-wrap:wrap; }.countdown-panel { display:flex; flex-wrap:wrap; gap:8px 20px; }.countdown-date { flex-basis:100%; }.hero-art { right:-25px; opacity:.75; }.hero-copy { width:80%; }.podium-card { padding:12px; }.site-footer { margin:0 30px; } }
+@media(max-width:760px) { .header-inner { height:80px; padding:0 20px; }.desktop-nav { display:none; }.brand-name { font-size:18px; }.admin-link { font-size:10px; }.site-main { padding:20px 20px 40px; }.hero-copy { padding:30px 25px; width:100%; }.hero .eyebrow { font-size:7px; letter-spacing:1.1px; }.hero h1 { font-size:clamp(45px,9.2vw,67px); margin-top:26px; }.hero-description { max-width:280px; font-size:12px; }.hero-art { opacity:.17; right:-110px; top:35px; }.hero-bottom { padding:13px 25px; font-size:7px; letter-spacing:1px; }.hero-bottom>span:last-child { display:none; }.season-strip { grid-template-columns:1fr 1fr; row-gap:23px; padding:24px 0; margin-bottom:30px; }.season-stat:nth-child(2) { border:0; }.season-stat>strong { font-size:38px; }.countdown-panel { grid-column:1/-1; padding:18px 0 0; border-top:1px solid var(--line); display:grid; grid-template-columns:1fr auto; gap:8px; }.countdown { gap:17px; }.competition-layout { grid-template-columns:1fr; gap:36px; }.section-heading { flex-wrap:nowrap; gap:8px; }.section-heading h2 { font-size:27px; }.filter-tabs button { padding:9px 10px; }.challenge-sidebar { display:grid; grid-template-columns:1fr 1fr; gap:16px; }.challenge-sidebar .section-heading { grid-column:1/-1; margin:0; }.challenge-preview { margin:0; }.rules-card { align-self:start; }.closing-line { flex-direction:column; gap:5px; font-size:31px; }.site-footer { flex-wrap:wrap; margin:0 20px; padding-bottom:110px; font-size:9px; }.site-footer>span:last-child { display:none; }.mobile-nav { display:flex; position:fixed; z-index:50; bottom:0; left:0; right:0; background:var(--paper); border-top:1px solid var(--line); padding:10px 16px calc(10px + env(safe-area-inset-bottom)); gap:8px; }.mobile-nav a { display:flex; align-items:center; justify-content:center; gap:12px; width:50%; font-size:12px; font-weight:700; padding:15px 10px; border-radius:5px; }.mobile-nav a>span:first-child { font-size:9px; opacity:.65; }.mobile-nav a.active { background:var(--ink); color:#fff; } }
+@media(max-width:430px) { .site-main { padding-left:14px; padding-right:14px; }.header-inner { padding:0 16px; }.brand-mark { width:37px; height:37px; font-size:29px; }.brand-name { font-size:16px; }.brand-name>span { font-size:7px; }.admin-link span { margin-left:5px; }.hero-copy { padding:28px 22px; }.hero h1 { font-size:48px; letter-spacing:-1px; }.section-heading { flex-wrap:wrap; gap:16px; }.section-heading h2 { font-size:29px; }.podium { gap:7px; }.podium-card { padding:11px 9px; }.podium-top .eyebrow { font-size:6px; letter-spacing:.4px; }.podium-rank { font-size:16px; }.podium-card h3 { font-size:11px; }.podium-score { font-size:30px; }.leaderboard td,.leaderboard th { padding-left:15px; padding-right:15px; }.challenge-sidebar { grid-template-columns:1fr; }.countdown strong { font-size:26px; }.countdown { gap:13px; }.countdown-date { font-size:8px; }.challenge-page section.rounded-2xl { padding:18px; }.login-panel form { padding:20px; } }
+@media(prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } *, *::before, *::after { animation:none !important; transition:none !important; } }
