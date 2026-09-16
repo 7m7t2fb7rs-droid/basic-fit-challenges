@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { useData } from "@/lib/store";
 import {
   buildLeaderboard,
   rankChallenge,
@@ -13,7 +13,7 @@ import {
   attachParticipants,
   filterEntriesByGender,
 } from "@/lib/scoring";
-import { fetchCountdownEnd, endOfDay, DEFAULT_COUNTDOWN_END } from "@/lib/settings";
+import { endOfDay } from "@/lib/settings";
 
 function useCountdown(target) {
   const calc = () => {
@@ -146,15 +146,26 @@ function ParticipantSheet({ person, rows, onClose }) {
 }
 
 export default function HomePage() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [counting, setCounting] = useState([]);
-  const [activeChallenges, setActiveChallenges] = useState([]);
-  const [byCh, setByCh] = useState({});
-  const [participants, setParticipants] = useState([]);
-  const [endDate, setEndDate] = useState(DEFAULT_COUNTDOWN_END);
+  // Données partagées avec la page des défis : au retour, rien à recharger.
+  const { data, loading, error } = useData();
   const [filter, setFilter] = useState("all");
   const [selectedId, setSelectedId] = useState(null);
+
+  const participants = data?.participants || [];
+  const endDate = data?.countdownEnd;
+
+  const { counting, activeChallenges, byCh } = useMemo(() => {
+    if (!data) return { counting: [], activeChallenges: [], byCh: {} };
+    const map = {};
+    attachParticipants(data.entries, indexParticipants(data.participants)).forEach((e) => {
+      (map[e.challenge_id] = map[e.challenge_id] || []).push(e);
+    });
+    return {
+      counting: data.challenges.filter((c) => c.status !== "upcoming"),
+      activeChallenges: data.challenges.filter((c) => c.status === "active"),
+      byCh: map,
+    };
+  }, [data]);
 
   // Filtre "H"/"F" : on écarte les scores des autres AVANT le calcul, donc le
   // barème F1 est recalculé au sein du groupe (1er du groupe = 25 pts).
@@ -192,37 +203,6 @@ export default function HomePage() {
   useEffect(() => {
     if (selectedId && !board.some((p) => p.id === selectedId)) setSelectedId(null);
   }, [board, selectedId]);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        setEndDate(await fetchCountdownEnd());
-        const { data: ch, error: e1 } = await supabase
-          .from("challenges")
-          .select("*")
-          .order("sort_order", { ascending: true });
-        if (e1) throw e1;
-        const { data: en, error: e2 } = await supabase.from("entries").select("*");
-        if (e2) throw e2;
-        const { data: pa, error: e3 } = await supabase.from("participants").select("*");
-        if (e3) throw e3;
-
-        const allCh = ch || [];
-        const map = {};
-        attachParticipants(en, indexParticipants(pa)).forEach((e) => {
-          (map[e.challenge_id] = map[e.challenge_id] || []).push(e);
-        });
-        setParticipants(pa || []);
-        setCounting(allCh.filter((c) => c.status !== "upcoming"));
-        setActiveChallenges(allCh.filter((c) => c.status === "active"));
-        setByCh(map);
-      } catch (err) {
-        setError(err.message || "Erreur de chargement");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
 
   return (
     <div className="home-page">

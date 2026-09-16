@@ -18,6 +18,7 @@ import {
   saveCountdownEnd,
   DEFAULT_COUNTDOWN_END,
 } from "@/lib/settings";
+import { invalidateData } from "@/lib/store";
 
 /* ------------------------------------------------------------------ */
 /*  Page admin : connexion + gestion des défis et des scores          */
@@ -125,6 +126,9 @@ function Dashboard({ email }) {
     setEntries(enRes.data || []);
     setParticipants(paRes.data || []);
     setLoading(false);
+    // Le classement public garde ses données en mémoire : après une saisie,
+    // il doit les relire plutôt que de resservir l'état d'avant.
+    invalidateData();
   }, []);
 
   useEffect(() => {

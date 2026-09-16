@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { useMemo } from "react";
+import { useData } from "@/lib/store";
 import {
   rankChallenge,
   METRIC_LABEL,
@@ -25,36 +25,17 @@ function StatusBadge({ status }) {
 }
 
 export default function DefisPage() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [challenges, setChallenges] = useState([]);
-  const [entriesByCh, setEntriesByCh] = useState({});
+  // Mêmes données que la page d'accueil, déjà en mémoire au retour.
+  const { data, loading, error } = useData();
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data: ch, error: e1 } = await supabase
-          .from("challenges")
-          .select("*")
-          .order("sort_order", { ascending: true });
-        if (e1) throw e1;
-        const { data: en, error: e2 } = await supabase.from("entries").select("*");
-        if (e2) throw e2;
-        const { data: pa, error: e3 } = await supabase.from("participants").select("*");
-        if (e3) throw e3;
-        const byCh = {};
-        attachParticipants(en, indexParticipants(pa)).forEach((e) => {
-          (byCh[e.challenge_id] = byCh[e.challenge_id] || []).push(e);
-        });
-        setChallenges(ch || []);
-        setEntriesByCh(byCh);
-      } catch (err) {
-        setError(err.message || "Erreur de chargement");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  const { challenges, entriesByCh } = useMemo(() => {
+    if (!data) return { challenges: [], entriesByCh: {} };
+    const byCh = {};
+    attachParticipants(data.entries, indexParticipants(data.participants)).forEach((e) => {
+      (byCh[e.challenge_id] = byCh[e.challenge_id] || []).push(e);
+    });
+    return { challenges: data.challenges, entriesByCh: byCh };
+  }, [data]);
 
   if (loading) return <p className="text-neutral-500">Chargement des défis…</p>;
   if (error)
