@@ -1139,6 +1139,8 @@ function ScoresManager({ challenges, entries, participants, onChange }) {
                     key={r.id}
                     r={r}
                     metric={selected.metric}
+                    participants={participants}
+                    siblings={chEntries}
                     onSave={onChange}
                     onRemove={remove}
                   />
@@ -1160,14 +1162,25 @@ function ScoresManager({ challenges, entries, participants, onChange }) {
 }
 
 /* ----------------------- Ligne score éditable ---------------------- */
-function ScoreRow({ r, metric, onSave, onRemove }) {
+function ScoreRow({ r, metric, participants, siblings, onSave, onRemove }) {
   const [editing, setEditing] = useState(false);
   const [rawValue, setRawValue] = useState(r.raw_value);
+  const [participantId, setParticipantId] = useState(r.participant_id);
   const [verifiedBy, setVerifiedBy] = useState(r.verified_by || "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
 
   const who = displayName(r.participant);
+
+  const choices = [...(participants || [])].sort((a, b) =>
+    displayName(a).localeCompare(displayName(b), "fr")
+  );
+
+  // Réattribuer à quelqu'un qui a déjà un score sur ce défi en créerait un
+  // second pour la même personne : on bloque plutôt que de laisser passer.
+  const clash = (siblings || []).find(
+    (e) => e.id !== r.id && e.participant_id === participantId
+  );
 
   const validate = (v) => {
     if (metric === "time" && !/^\d+:[0-5]\d$/.test(v.trim()))
@@ -1180,12 +1193,14 @@ function ScoreRow({ r, metric, onSave, onRemove }) {
   const save = async () => {
     const e = validate(rawValue);
     if (e) { setErr(e); return; }
+    if (clash) { setErr("Cette personne a déjà un score sur ce défi."); return; }
     setErr(null);
     setBusy(true);
     const { error } = await supabase
       .from("entries")
       .update({
         raw_value: rawValue.trim(),
+        participant_id: participantId,
         verified_by: verifiedBy.trim() || null,
       })
       .eq("id", r.id);
@@ -1198,6 +1213,7 @@ function ScoreRow({ r, metric, onSave, onRemove }) {
   const cancel = () => {
     setEditing(false);
     setRawValue(r.raw_value);
+    setParticipantId(r.participant_id);
     setVerifiedBy(r.verified_by || "");
     setErr(null);
   };
@@ -1238,7 +1254,24 @@ function ScoreRow({ r, metric, onSave, onRemove }) {
   return (
     <tr className="border-t border-bf-orange/30 bg-bf-light/40">
       <td className="px-2 py-2 font-bold text-neutral-400">{r.rank}</td>
-      <td className="px-2 py-2 font-semibold">{who}</td>
+      <td className="px-2 py-2">
+        <select
+          value={participantId}
+          onChange={(e) => setParticipantId(e.target.value)}
+          className="max-w-[10rem] rounded border border-neutral-300 px-1.5 py-1 text-sm"
+        >
+          {choices.map((p) => (
+            <option key={p.id} value={p.id}>
+              {displayName(p)}
+            </option>
+          ))}
+        </select>
+        {clash && (
+          <p className="mt-0.5 text-xs font-semibold text-amber-600">
+            déjà un score ici
+          </p>
+        )}
+      </td>
       <td className="px-2 py-2">
         <input
           value={rawValue}
@@ -1260,7 +1293,7 @@ function ScoreRow({ r, metric, onSave, onRemove }) {
       <td className="px-2 py-2 text-right whitespace-nowrap">
         <button
           onClick={save}
-          disabled={busy}
+          disabled={busy || !!clash}
           className="text-xs font-semibold text-white bg-bf-orange rounded px-2 py-1 mr-1 disabled:opacity-60"
         >
           {busy ? "…" : "OK"}
