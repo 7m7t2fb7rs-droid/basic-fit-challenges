@@ -66,8 +66,23 @@ export default function DefisPage() {
       </div>
     );
 
-  const current = challenges.filter((c) => c.status !== "upcoming");
-  const upcoming = challenges.filter((c) => c.status === "upcoming");
+  // Défis passés et en cours : le plus récent en premier.
+  // On se fie à la date de fin ; sans date, on retombe sur l'ordre d'affichage.
+  const byRecentFirst = (a, b) => {
+    if (a.end_date && b.end_date) return b.end_date.localeCompare(a.end_date);
+    if (a.end_date) return -1;
+    if (b.end_date) return 1;
+    return (b.sort_order ?? 0) - (a.sort_order ?? 0);
+  };
+
+  const current = challenges
+    .filter((c) => c.status !== "upcoming")
+    .sort(byRecentFirst);
+
+  // Les défis à venir restent dans l'ordre chronologique : le prochain d'abord.
+  const upcoming = challenges
+    .filter((c) => c.status === "upcoming")
+    .sort((a, b) => -byRecentFirst(a, b));
 
   return (
     <div className="space-y-8">
