@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { rankChallenge, METRIC_LABEL, STATUS_LABEL } from "@/lib/scoring";
+import {
+  rankChallenge,
+  METRIC_LABEL,
+  STATUS_LABEL,
+  displayName,
+  indexParticipants,
+  attachParticipants,
+} from "@/lib/scoring";
 
 const MEDAL = ["🥇", "🥈", "🥉"];
 
@@ -35,8 +42,10 @@ export default function DefisPage() {
         if (e1) throw e1;
         const { data: en, error: e2 } = await supabase.from("entries").select("*");
         if (e2) throw e2;
+        const { data: pa, error: e3 } = await supabase.from("participants").select("*");
+        if (e3) throw e3;
         const byCh = {};
-        (en || []).forEach((e) => {
+        attachParticipants(en, indexParticipants(pa)).forEach((e) => {
           (byCh[e.challenge_id] = byCh[e.challenge_id] || []).push(e);
         });
         setChallenges(ch || []);
@@ -113,7 +122,7 @@ export default function DefisPage() {
                           {r.rank <= 3 ? MEDAL[r.rank - 1] : r.rank}
                         </td>
                         <td className="px-2 py-1.5 font-semibold">
-                          {r.participant_name}
+                          {displayName(r.participant)}
                         </td>
                         <td className="px-2 py-1.5 text-neutral-600">{r.raw_value}</td>
                         <td className="text-bf-dark px-2 py-1.5 text-right font-extrabold">

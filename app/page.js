@@ -7,7 +7,9 @@ import {
   rankChallenge,
   METRIC_LABEL,
   GENDER_LABEL,
-  genderByParticipant,
+  displayName,
+  indexParticipants,
+  attachParticipants,
   filterEntriesByGender,
 } from "@/lib/scoring";
 import { fetchCountdownEnd, endOfDay, DEFAULT_COUNTDOWN_END } from "@/lib/settings";
@@ -94,23 +96,18 @@ export default function HomePage() {
   const [counting, setCounting] = useState([]);
   const [activeChallenges, setActiveChallenges] = useState([]);
   const [byCh, setByCh] = useState({});
+  const [participants, setParticipants] = useState([]);
   const [endDate, setEndDate] = useState(DEFAULT_COUNTDOWN_END);
   const [filter, setFilter] = useState("all");
-
-  // Le genre est une propriété de la personne, déduite de ses scores.
-  const genderMap = useMemo(
-    () => genderByParticipant(Object.values(byCh).flat()),
-    [byCh]
-  );
 
   // Filtre "H"/"F" : on écarte les scores des autres AVANT le calcul, donc le
   // barème F1 est recalculé au sein du groupe (1er du groupe = 25 pts).
   const board = useMemo(
-    () => buildLeaderboard(counting, filterEntriesByGender(byCh, filter, genderMap)),
-    [counting, byCh, filter, genderMap]
+    () => buildLeaderboard(counting, filterEntriesByGender(byCh, filter)),
+    [counting, byCh, filter]
   );
 
-  const hasGenderData = Object.keys(genderMap).length > 0;
+  const hasGenderData = participants.some((p) => p.gender);
 
   useEffect(() => {
     (async () => {
@@ -123,12 +120,15 @@ export default function HomePage() {
         if (e1) throw e1;
         const { data: en, error: e2 } = await supabase.from("entries").select("*");
         if (e2) throw e2;
+        const { data: pa, error: e3 } = await supabase.from("participants").select("*");
+        if (e3) throw e3;
 
         const allCh = ch || [];
         const map = {};
-        (en || []).forEach((e) => {
+        attachParticipants(en, indexParticipants(pa)).forEach((e) => {
           (map[e.challenge_id] = map[e.challenge_id] || []).push(e);
         });
+        setParticipants(pa || []);
 
         setCounting(allCh.filter((c) => c.status !== "upcoming"));
         setActiveChallenges(allCh.filter((c) => c.status === "active"));
@@ -181,8 +181,8 @@ export default function HomePage() {
               </p>
               {!hasGenderData && (
                 <p className="mt-1 text-sm text-neutral-400">
-                  Le genre n&apos;a encore été renseigné sur aucun score — il se
-                  saisit depuis l&apos;espace admin.
+                  Le genre n&apos;a encore été renseigné sur aucune fiche
+                  participant — il se saisit depuis l&apos;espace admin.
                 </p>
               )}
             </>
@@ -194,7 +194,7 @@ export default function HomePage() {
           <div className="grid grid-cols-3 gap-2">
             {board.slice(0, 3).map((p, i) => (
               <div
-                key={p.name}
+                key={p.id}
                 className={`rounded-2xl px-2 py-3 text-center shadow-sm ${
                   i === 0
                     ? "bg-gradient-to-b from-amber-100 to-white ring-2 ring-amber-300"
@@ -221,7 +221,7 @@ export default function HomePage() {
               </thead>
               <tbody>
                 {board.map((p) => (
-                  <tr key={p.name} className="border-t border-neutral-100">
+                  <tr key={p.id} className="border-t border-neutral-100">
                     <td className="px-3 py-2 font-bold text-neutral-500">{p.rank}</td>
                     <td className="px-3 py-2 font-semibold">{p.name}</td>
                     <td className="text-bf-dark px-3 py-2 text-center font-extrabold">
@@ -272,7 +272,7 @@ export default function HomePage() {
                     {ranked.slice(0, 5).map((r) => (
                       <div key={r.id} className="flex items-center gap-2 text-sm">
                         <span className="w-5 text-center font-bold text-neutral-400">{r.rank}</span>
-                        <span className="flex-1 font-semibold">{r.participant_name}</span>
+                        <span className="flex-1 font-semibold">{displayName(r.participant)}</span>
                         <span className="text-neutral-500">{r.raw_value}</span>
                         <span className="w-10 text-right font-extrabold text-bf-dark">{r.points} pts</span>
                       </div>

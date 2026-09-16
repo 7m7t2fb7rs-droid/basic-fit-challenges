@@ -7,7 +7,10 @@ import {
   METRIC_LABEL,
   STATUS_LABEL,
   GENDER_LABEL,
-  genderByParticipant,
+  displayName,
+  indexParticipants,
+  attachParticipants,
+  matchParticipants,
   nameKey,
 } from "@/lib/scoring";
 import {
@@ -97,6 +100,7 @@ function LoginForm() {
 function Dashboard({ email }) {
   const [challenges, setChallenges] = useState([]);
   const [entries, setEntries] = useState([]);
+  const [participants, setParticipants] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
@@ -106,8 +110,10 @@ function Dashboard({ email }) {
       .select("*")
       .order("sort_order", { ascending: true });
     const { data: en } = await supabase.from("entries").select("*");
+    const { data: pa } = await supabase.from("participants").select("*");
     setChallenges(ch || []);
     setEntries(en || []);
+    setParticipants(pa || []);
     setLoading(false);
   }, []);
 
@@ -137,6 +143,12 @@ function Dashboard({ email }) {
           <CountdownManager />
           <ScoresManager
             challenges={challenges}
+            entries={entries}
+            participants={participants}
+            onChange={reload}
+          />
+          <ParticipantsManager
+            participants={participants}
             entries={entries}
             onChange={reload}
           />
@@ -489,35 +501,495 @@ function ChallengeRow({ challenge, onChange }) {
   );
 }
 
+/* --------------------- Fiches des participants -------------------- */
+/*  Une personne = une fiche. Le prénom seul suffit ; le nom de famille
+    ne sert qu'à distinguer deux homonymes.                            */
+function ParticipantsManager({ participants, entries, onChange }) {
+  const [form, setForm] = useState({ first_name: "", last_name: "", gender: "" });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const scoreCount = (id) => entries.filter((e) => e.participant_id === id).length;
+  const sorted = [...participants].sort((a, b) =>
+    displayName(a).localeCompare(displayName(b), "fr")
+  );
+
+  // Même prénom + même nom qu'une fiche existante : on prévient sans bloquer,
+  // c'est peut-être réellement deux personnes différentes.
+  const duplicate = participants.find(
+    (p) =>
+      nameKey(p.first_name) === nameKey(form.first_name) &&
+      nameKey(p.last_name) === nameKey(form.last_name)
+  );
+  const sameFirstName = participants.filter(
+    (p) => nameKey(p.first_name) === nameKey(form.first_name)
+  );
+
+  const create = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setErr(null);
+    const { error } = await supabase.from("participants").insert({
+      first_name: form.first_name.trim(),
+      last_name: form.last_name.trim() || null,
+      gender: form.gender || null,
+    });
+    setBusy(false);
+    if (error) return setErr(error.message);
+    setForm({ first_name: "", last_name: "", gender: "" });
+    onChange();
+  };
+
+  return (
+    <section className="rounded-2xl bg-white p-5 shadow-sm">
+      <h2 className="text-lg font-bold">Participants</h2>
+      <p className="mb-4 text-sm text-neutral-500">
+        Chaque personne a une fiche unique. Deux personnes du même prénom sont
+        deux fiches distinctes — ajoute le nom de famille pour les différencier.
+      </p>
+
+      <div className="space-y-2">
+        {sorted.map((p) => (
+          <ParticipantRow
+            key={p.id}
+            participant={p}
+            scores={scoreCount(p.id)}
+            onChange={onChange}
+          />
+        ))}
+        {sorted.length === 0 && (
+          <p className="text-sm text-neutral-400">Aucune fiche pour l&apos;instant.</p>
+        )}
+      </div>
+
+      <form
+        onSubmit={create}
+        className="mt-5 grid gap-2 rounded-xl border border-dashed border-neutral-300 p-4 sm:grid-cols-4"
+      >
+        <div className="text-sm font-semibold text-neutral-700 sm:col-span-4">
+          Nouveau participant
+        </div>
+        <input
+          required
+          placeholder="Prénom"
+          value={form.first_name}
+          onChange={(e) => setForm({ ...form, first_name: e.target.value })}
+          className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+        />
+        <input
+          placeholder="Nom (si homonyme)"
+          value={form.last_name}
+          onChange={(e) => setForm({ ...form, last_name: e.target.value })}
+          className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+        />
+        <select
+          value={form.gender}
+          onChange={(e) => setForm({ ...form, gender: e.target.value })}
+          className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+        >
+          <option value="">Genre —</option>
+          <option value="H">H — {GENDER_LABEL.H}</option>
+          <option value="F">F — {GENDER_LABEL.F}</option>
+        </select>
+        <button
+          disabled={busy || !form.first_name.trim()}
+          className="rounded-lg bg-bf-orange px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+        >
+          {busy ? "…" : "Créer la fiche"}
+        </button>
+
+        {form.first_name.trim() && sameFirstName.length > 0 && (
+          <p className="sm:col-span-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            {duplicate ? (
+              <>
+                <span className="font-semibold">
+                  {displayName(duplicate)} existe déjà
+                </span>{" "}
+                ({scoreCount(duplicate.id)} score
+                {scoreCount(duplicate.id) > 1 ? "s" : ""}). Si c&apos;est une
+                autre personne, distingue-les par le nom de famille.
+              </>
+            ) : (
+              <>
+                Déjà{" "}
+                <span className="font-semibold">
+                  {sameFirstName.map((p) => displayName(p)).join(", ")}
+                </span>{" "}
+                avec ce prénom. Ajoute un nom de famille pour éviter la confusion.
+              </>
+            )}
+          </p>
+        )}
+        {err && <p className="sm:col-span-4 text-sm text-red-600">{err}</p>}
+      </form>
+    </section>
+  );
+}
+
+function ParticipantRow({ participant, scores, onChange }) {
+  const [edit, setEdit] = useState(false);
+  const [p, setP] = useState({
+    first_name: participant.first_name,
+    last_name: participant.last_name || "",
+    gender: participant.gender || "",
+  });
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    setBusy(true);
+    const { error } = await supabase
+      .from("participants")
+      .update({
+        first_name: p.first_name.trim(),
+        last_name: p.last_name.trim() || null,
+        gender: p.gender || null,
+      })
+      .eq("id", participant.id);
+    setBusy(false);
+    if (error) return alert(error.message);
+    setEdit(false);
+    onChange();
+  };
+
+  const remove = async () => {
+    const warn = scores
+      ? `Supprimer ${displayName(participant)} ET ses ${scores} score${
+          scores > 1 ? "s" : ""
+        } ?`
+      : `Supprimer la fiche de ${displayName(participant)} ?`;
+    if (!confirm(warn)) return;
+    const { error } = await supabase
+      .from("participants")
+      .delete()
+      .eq("id", participant.id);
+    if (error) return alert(error.message);
+    onChange();
+  };
+
+  if (!edit) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-neutral-200 px-3 py-2">
+        <span className="font-semibold">{displayName(participant)}</span>
+        {participant.gender ? (
+          <span
+            title={GENDER_LABEL[participant.gender]}
+            className="rounded-full bg-bf-light px-2 py-0.5 text-xs font-bold text-bf-dark"
+          >
+            {participant.gender}
+          </span>
+        ) : (
+          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+            genre à renseigner
+          </span>
+        )}
+        <span className="text-xs text-neutral-400">
+          {scores} score{scores > 1 ? "s" : ""}
+        </span>
+        <div className="ml-auto flex gap-2">
+          <button
+            onClick={() => setEdit(true)}
+            className="rounded-lg border border-neutral-300 px-2.5 py-1 text-xs font-semibold hover:bg-neutral-100"
+          >
+            Modifier
+          </button>
+          <button
+            onClick={remove}
+            className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+          >
+            Supprimer
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-2 rounded-xl border border-bf-orange/40 bg-bf-light/40 p-3 sm:grid-cols-3">
+      <input
+        value={p.first_name}
+        placeholder="Prénom"
+        onChange={(e) => setP({ ...p, first_name: e.target.value })}
+        className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+      />
+      <input
+        value={p.last_name}
+        placeholder="Nom (si homonyme)"
+        onChange={(e) => setP({ ...p, last_name: e.target.value })}
+        className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+      />
+      <select
+        value={p.gender}
+        onChange={(e) => setP({ ...p, gender: e.target.value })}
+        className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+      >
+        <option value="">Genre —</option>
+        <option value="H">H — {GENDER_LABEL.H}</option>
+        <option value="F">F — {GENDER_LABEL.F}</option>
+      </select>
+      <div className="flex gap-2 sm:col-span-3">
+        <button
+          onClick={save}
+          disabled={busy || !p.first_name.trim()}
+          className="rounded-lg bg-bf-orange px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
+        >
+          {busy ? "…" : "Enregistrer"}
+        </button>
+        <button
+          onClick={() => setEdit(false)}
+          className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-semibold hover:bg-neutral-100"
+        >
+          Annuler
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ------------- Sélection du participant à la saisie d'un score ------ */
+/*  Tape un prénom : les fiches existantes remontent avec leurs scores,
+    pour être sûr de ne pas confondre deux personnes ni saisir deux fois
+    la même.                                                            */
+function ParticipantPicker({
+  participants,
+  entries,
+  challenges,
+  selectedChallengeId,
+  value,
+  onChange,
+  onCreated,
+}) {
+  const [query, setQuery] = useState("");
+  const [creating, setCreating] = useState(null); // { first_name, last_name, gender }
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const picked = participants.find((p) => p.id === value) || null;
+  const matches = picked ? [] : matchParticipants(participants, query).slice(0, 6);
+  const noMatch = !picked && query.trim() && matches.length === 0;
+
+  const scoresOf = (id) => entries.filter((e) => e.participant_id === id);
+  const chName = (id) => challenges.find((c) => c.id === id)?.name || "défi supprimé";
+
+  // Le vrai piège : saisir deux fois la même personne sur le même défi.
+  const already = picked
+    ? scoresOf(picked.id).find((e) => e.challenge_id === selectedChallengeId)
+    : null;
+
+  const startCreate = () => {
+    const parts = query.trim().split(/\s+/);
+    setCreating({
+      first_name: parts[0] || "",
+      last_name: parts.slice(1).join(" "),
+      gender: "",
+    });
+  };
+
+  const create = async () => {
+    setBusy(true);
+    setErr(null);
+    const { data, error } = await supabase
+      .from("participants")
+      .insert({
+        first_name: creating.first_name.trim(),
+        last_name: creating.last_name.trim() || null,
+        gender: creating.gender || null,
+      })
+      .select()
+      .single();
+    setBusy(false);
+    if (error) return setErr(error.message);
+    setCreating(null);
+    setQuery("");
+    onCreated?.();
+    onChange(data.id);
+  };
+
+  if (picked) {
+    const list = scoresOf(picked.id);
+    return (
+      <div className="rounded-xl border border-bf-orange/40 bg-bf-light/30 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-bold">{displayName(picked)}</span>
+          {picked.gender ? (
+            <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-bf-dark">
+              {picked.gender}
+            </span>
+          ) : (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+              genre à renseigner
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              onChange("");
+              setQuery("");
+            }}
+            className="ml-auto text-xs font-semibold text-neutral-500 hover:underline"
+          >
+            Changer
+          </button>
+        </div>
+
+        {already && (
+          <p className="mt-2 rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900">
+            <span className="font-semibold">Attention :</span> cette personne a
+            déjà un score sur ce défi ({already.raw_value}). Modifie-le plutôt
+            que d&apos;en ajouter un second.
+          </p>
+        )}
+
+        <div className="mt-2 text-sm">
+          <span className="text-neutral-500">
+            {list.length === 0
+              ? "Aucun score enregistré pour l'instant."
+              : `Scores déjà enregistrés (${list.length}) :`}
+          </span>
+          {list.length > 0 && (
+            <ul className="mt-1 space-y-0.5">
+              {list.map((e) => (
+                <li key={e.id} className="flex gap-2 text-neutral-600">
+                  <span className="text-neutral-400">{chName(e.challenge_id)}</span>
+                  <span className="font-semibold">{e.raw_value}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (creating) {
+    return (
+      <div className="grid gap-2 rounded-xl border border-bf-orange/40 bg-bf-light/30 p-3 sm:grid-cols-3">
+        <div className="text-sm font-semibold text-neutral-700 sm:col-span-3">
+          Nouvelle fiche
+        </div>
+        <input
+          autoFocus
+          placeholder="Prénom"
+          value={creating.first_name}
+          onChange={(e) => setCreating({ ...creating, first_name: e.target.value })}
+          className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+        />
+        <input
+          placeholder="Nom (si homonyme)"
+          value={creating.last_name}
+          onChange={(e) => setCreating({ ...creating, last_name: e.target.value })}
+          className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+        />
+        <select
+          value={creating.gender}
+          onChange={(e) => setCreating({ ...creating, gender: e.target.value })}
+          className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+        >
+          <option value="">Genre —</option>
+          <option value="H">H — {GENDER_LABEL.H}</option>
+          <option value="F">F — {GENDER_LABEL.F}</option>
+        </select>
+        {err && <p className="text-sm text-red-600 sm:col-span-3">{err}</p>}
+        <div className="flex gap-2 sm:col-span-3">
+          <button
+            type="button"
+            onClick={create}
+            disabled={busy || !creating.first_name.trim()}
+            className="rounded-lg bg-bf-orange px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            {busy ? "…" : "Créer et sélectionner"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setCreating(null)}
+            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-semibold hover:bg-neutral-100"
+          >
+            Annuler
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Tape un prénom…"
+        className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm sm:w-72"
+      />
+
+      {matches.length > 0 && (
+        <ul className="mt-1 divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200">
+          {matches.map((p) => {
+            const n = scoresOf(p.id).length;
+            const dup = scoresOf(p.id).some(
+              (e) => e.challenge_id === selectedChallengeId
+            );
+            return (
+              <li key={p.id}>
+                <button
+                  type="button"
+                  onClick={() => onChange(p.id)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-bf-light/50"
+                >
+                  <span className="font-semibold">{displayName(p)}</span>
+                  {p.gender && (
+                    <span className="rounded-full bg-neutral-100 px-1.5 text-xs font-bold text-neutral-500">
+                      {p.gender}
+                    </span>
+                  )}
+                  <span className="ml-auto text-xs text-neutral-400">
+                    {n} score{n > 1 ? "s" : ""}
+                    {dup && (
+                      <span className="ml-1 font-semibold text-amber-600">
+                        · déjà sur ce défi
+                      </span>
+                    )}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {noMatch && (
+        <div className="mt-1 rounded-xl border border-dashed border-neutral-300 px-3 py-2 text-sm">
+          <span className="text-neutral-500">Aucune fiche ne correspond.</span>
+          <button
+            type="button"
+            onClick={startCreate}
+            className="ml-2 font-semibold text-bf-dark hover:underline"
+          >
+            Créer « {query.trim()} »
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------------------- Gestion des scores ------------------------ */
-function ScoresManager({ challenges, entries, onChange }) {
+function ScoresManager({ challenges, entries, participants, onChange }) {
   const sorted = [...challenges].sort((a, b) => {
     if (a.status === "active" && b.status !== "active") return -1;
     if (b.status === "active" && a.status !== "active") return 1;
     return 0;
   });
   const [selectedId, setSelectedId] = useState(sorted[0]?.id || "");
-  const [name, setName] = useState("");
+  const [participantId, setParticipantId] = useState("");
   const [value, setValue] = useState("");
-  const [gender, setGender] = useState("");
   const [verifiedBy, setVerifiedBy] = useState("");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState(null);
 
-  // Genre déjà connu pour chaque participant (toutes épreuves confondues).
-  const genderMap = genderByParticipant(entries);
-
-  // Si le participant a déjà été enregistré, on reprend son genre — évite de
-  // le ressaisir et garantit qu'il reste cohérent d'un défi à l'autre.
-  const onNameChange = (v) => {
-    setName(v);
-    const known = genderMap[nameKey(v)];
-    if (known) setGender(known);
-  };
-
   const selected = sorted.find((c) => c.id === selectedId);
   const chEntries = entries.filter((e) => e.challenge_id === selectedId);
-  const ranked = selected ? rankChallenge(chEntries, selected.metric) : [];
+  const byId = indexParticipants(participants);
+  const ranked = selected
+    ? rankChallenge(attachParticipants(chEntries, byId), selected.metric)
+    : [];
 
   const validate = (raw, metric) => {
     if (metric === "time" && !/^\d+:[0-5]\d$/.test(raw.trim()))
@@ -530,28 +1002,30 @@ function ScoresManager({ challenges, entries, onChange }) {
   const add = async (e) => {
     e.preventDefault();
     if (!selectedId) return;
+    if (!participantId) {
+      setFormError("Choisis un participant.");
+      return;
+    }
     const err = validate(value, selected.metric);
     if (err) { setFormError(err); return; }
     setFormError(null);
     setBusy(true);
     const { error } = await supabase.from("entries").insert({
       challenge_id: selectedId,
-      participant_name: name.trim(),
+      participant_id: participantId,
       raw_value: value.trim(),
-      gender: gender || null,
       verified_by: verifiedBy.trim() || null,
     });
     setBusy(false);
     if (error) { setFormError(error.message); return; }
-    setName("");
+    setParticipantId("");
     setValue("");
-    setGender("");
     setVerifiedBy("");
     onChange();
   };
 
-  const remove = async (id, participantName) => {
-    if (!confirm(`Supprimer le score de « ${participantName} » ?`)) return;
+  const remove = async (id, who) => {
+    if (!confirm(`Supprimer le score de « ${who} » ?`)) return;
     const { error } = await supabase.from("entries").delete().eq("id", id);
     if (error) return alert(error.message);
     onChange();
@@ -561,7 +1035,7 @@ function ScoresManager({ challenges, entries, onChange }) {
     <section className="rounded-2xl bg-white p-5 shadow-sm">
       <h2 className="text-lg font-bold">Scores des participants</h2>
       <p className="mb-4 text-sm text-neutral-500">
-        Choisis un défi, ajoute une performance. Le rang et les points se calculent seuls.
+        Choisis un défi, puis la personne. Le rang et les points se calculent seuls.
       </p>
 
       <label className="text-sm">
@@ -582,56 +1056,49 @@ function ScoresManager({ challenges, entries, onChange }) {
 
       {selected && (
         <>
-          <form onSubmit={add} className="mt-4 flex flex-wrap items-end gap-2">
-            <label className="text-sm">
+          <form onSubmit={add} className="mt-4 space-y-3">
+            <div className="text-sm">
               <span className="mb-1 block text-neutral-500">Participant</span>
-              <input
-                required
-                value={name}
-                onChange={(e) => onNameChange(e.target.value)}
-                placeholder="Prénom / pseudo"
-                className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              <ParticipantPicker
+                participants={participants}
+                entries={entries}
+                challenges={challenges}
+                selectedChallengeId={selectedId}
+                value={participantId}
+                onChange={setParticipantId}
+                onCreated={onChange}
               />
-            </label>
-            <label className="text-sm">
-              <span className="mb-1 block text-neutral-500">Genre</span>
-              <select
-                value={gender}
-                onChange={(e) => setGender(e.target.value)}
-                className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+            </div>
+
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="text-sm">
+                <span className="mb-1 block text-neutral-500">
+                  {selected.metric === "time" ? "Temps (mm:ss)" : "Répétitions"}
+                </span>
+                <input
+                  required
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  placeholder={selected.metric === "time" ? "2:40" : "42"}
+                  className="w-32 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-neutral-500">Vérifié par</span>
+                <input
+                  value={verifiedBy}
+                  onChange={(e) => setVerifiedBy(e.target.value)}
+                  placeholder="Ton prénom"
+                  className="w-36 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                />
+              </label>
+              <button
+                disabled={busy}
+                className="rounded-lg bg-bf-orange px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
               >
-                <option value="">—</option>
-                <option value="H">H — {GENDER_LABEL.H}</option>
-                <option value="F">F — {GENDER_LABEL.F}</option>
-              </select>
-            </label>
-            <label className="text-sm">
-              <span className="mb-1 block text-neutral-500">
-                {selected.metric === "time" ? "Temps (mm:ss)" : "Répétitions"}
-              </span>
-              <input
-                required
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                placeholder={selected.metric === "time" ? "2:40" : "42"}
-                className="w-32 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="text-sm">
-              <span className="mb-1 block text-neutral-500">Vérifié par</span>
-              <input
-                value={verifiedBy}
-                onChange={(e) => setVerifiedBy(e.target.value)}
-                placeholder="Ton prénom"
-                className="w-36 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-              />
-            </label>
-            <button
-              disabled={busy}
-              className="rounded-lg bg-bf-orange px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-            >
-              {busy ? "…" : "Ajouter"}
-            </button>
+                {busy ? "…" : "Ajouter"}
+              </button>
+            </div>
           </form>
           {formError && (
             <p className="mt-2 text-sm text-red-600">{formError}</p>
@@ -643,7 +1110,6 @@ function ScoresManager({ challenges, entries, onChange }) {
                 <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
                   <th className="px-2 py-1">Rang</th>
                   <th className="px-2 py-1">Nom</th>
-                  <th className="px-2 py-1">Genre</th>
                   <th className="px-2 py-1">Perf</th>
                   <th className="px-2 py-1">Points</th>
                   <th className="px-2 py-1">Vérifié par</th>
@@ -662,7 +1128,7 @@ function ScoresManager({ challenges, entries, onChange }) {
                 ))}
                 {ranked.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-2 py-3 text-neutral-400">
+                    <td colSpan={6} className="px-2 py-3 text-neutral-400">
                       Aucune performance pour ce défi.
                     </td>
                   </tr>
@@ -680,10 +1146,11 @@ function ScoresManager({ challenges, entries, onChange }) {
 function ScoreRow({ r, metric, onSave, onRemove }) {
   const [editing, setEditing] = useState(false);
   const [rawValue, setRawValue] = useState(r.raw_value);
-  const [gender, setGender] = useState(r.gender || "");
   const [verifiedBy, setVerifiedBy] = useState(r.verified_by || "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+
+  const who = displayName(r.participant);
 
   const validate = (v) => {
     if (metric === "time" && !/^\d+:[0-5]\d$/.test(v.trim()))
@@ -702,7 +1169,6 @@ function ScoreRow({ r, metric, onSave, onRemove }) {
       .from("entries")
       .update({
         raw_value: rawValue.trim(),
-        gender: gender || null,
         verified_by: verifiedBy.trim() || null,
       })
       .eq("id", r.id);
@@ -715,7 +1181,6 @@ function ScoreRow({ r, metric, onSave, onRemove }) {
   const cancel = () => {
     setEditing(false);
     setRawValue(r.raw_value);
-    setGender(r.gender || "");
     setVerifiedBy(r.verified_by || "");
     setErr(null);
   };
@@ -724,17 +1189,12 @@ function ScoreRow({ r, metric, onSave, onRemove }) {
     return (
       <tr className="border-t border-neutral-100">
         <td className="px-2 py-1.5 font-bold text-neutral-500">{r.rank}</td>
-        <td className="px-2 py-1.5 font-semibold">{r.participant_name}</td>
-        <td className="px-2 py-1.5">
-          {r.gender ? (
-            <span
-              title={GENDER_LABEL[r.gender]}
-              className="rounded-full bg-bf-light px-2 py-0.5 text-xs font-bold text-bf-dark"
-            >
-              {r.gender}
+        <td className="px-2 py-1.5 font-semibold">
+          {who}
+          {r.participant?.gender && (
+            <span className="ml-1.5 text-xs font-bold text-neutral-400">
+              {r.participant.gender}
             </span>
-          ) : (
-            <span className="text-xs text-neutral-300">—</span>
           )}
         </td>
         <td className="px-2 py-1.5 text-neutral-600">{r.raw_value}</td>
@@ -748,7 +1208,7 @@ function ScoreRow({ r, metric, onSave, onRemove }) {
             Modifier
           </button>
           <button
-            onClick={() => onRemove(r.id, r.participant_name)}
+            onClick={() => onRemove(r.id, who)}
             className="text-xs font-semibold text-red-500 hover:underline"
           >
             Suppr.
@@ -761,18 +1221,7 @@ function ScoreRow({ r, metric, onSave, onRemove }) {
   return (
     <tr className="border-t border-bf-orange/30 bg-bf-light/40">
       <td className="px-2 py-2 font-bold text-neutral-400">{r.rank}</td>
-      <td className="px-2 py-2 font-semibold">{r.participant_name}</td>
-      <td className="px-2 py-2">
-        <select
-          value={gender}
-          onChange={(e) => setGender(e.target.value)}
-          className="rounded border border-neutral-300 px-1.5 py-1 text-sm"
-        >
-          <option value="">—</option>
-          <option value="H">H</option>
-          <option value="F">F</option>
-        </select>
-      </td>
+      <td className="px-2 py-2 font-semibold">{who}</td>
       <td className="px-2 py-2">
         <input
           value={rawValue}
