@@ -13,7 +13,8 @@ Next.js (App Router) + Supabase, déployable sur Vercel.
 
 1. Va sur [supabase.com](https://supabase.com) → **New project** (note le mot de passe de la base).
 2. Menu **SQL Editor** → **New query** → colle tout le contenu de `supabase-schema.sql` → **Run**.
-   Puis refais la même chose avec `supabase-settings.sql` (table des réglages : date de fin du compte à rebours).
+   Puis refais la même chose avec `supabase-settings.sql` (réglages : date de fin du compte à rebours)
+   et `supabase-gender.sql` (genre H/F des participants, pour le filtre du classement).
    Ça crée les tables `challenges` et `entries` et les règles de sécurité.
 3. Menu **Project Settings → API** : copie **Project URL** et la clé **anon public**. On en a besoin à l'étape 3.
 
@@ -75,4 +76,5 @@ lib/
   scoring.js        → barème F1, classement
 supabase-schema.sql → tables + sécurité (à exécuter une fois)
 supabase-settings.sql → table des réglages, dont la date de fin du compte à rebours
+supabase-gender.sql   → colonne `gender` (H/F) sur les scores, filtre du classement
 ```

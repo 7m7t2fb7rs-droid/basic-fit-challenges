@@ -2,7 +2,14 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { rankChallenge, METRIC_LABEL, STATUS_LABEL } from "@/lib/scoring";
+import {
+  rankChallenge,
+  METRIC_LABEL,
+  STATUS_LABEL,
+  GENDER_LABEL,
+  genderByParticipant,
+  nameKey,
+} from "@/lib/scoring";
 import {
   fetchCountdownEnd,
   saveCountdownEnd,
@@ -492,9 +499,21 @@ function ScoresManager({ challenges, entries, onChange }) {
   const [selectedId, setSelectedId] = useState(sorted[0]?.id || "");
   const [name, setName] = useState("");
   const [value, setValue] = useState("");
+  const [gender, setGender] = useState("");
   const [verifiedBy, setVerifiedBy] = useState("");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState(null);
+
+  // Genre déjà connu pour chaque participant (toutes épreuves confondues).
+  const genderMap = genderByParticipant(entries);
+
+  // Si le participant a déjà été enregistré, on reprend son genre — évite de
+  // le ressaisir et garantit qu'il reste cohérent d'un défi à l'autre.
+  const onNameChange = (v) => {
+    setName(v);
+    const known = genderMap[nameKey(v)];
+    if (known) setGender(known);
+  };
 
   const selected = sorted.find((c) => c.id === selectedId);
   const chEntries = entries.filter((e) => e.challenge_id === selectedId);
@@ -519,12 +538,14 @@ function ScoresManager({ challenges, entries, onChange }) {
       challenge_id: selectedId,
       participant_name: name.trim(),
       raw_value: value.trim(),
+      gender: gender || null,
       verified_by: verifiedBy.trim() || null,
     });
     setBusy(false);
     if (error) { setFormError(error.message); return; }
     setName("");
     setValue("");
+    setGender("");
     setVerifiedBy("");
     onChange();
   };
@@ -567,10 +588,22 @@ function ScoresManager({ challenges, entries, onChange }) {
               <input
                 required
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => onNameChange(e.target.value)}
                 placeholder="Prénom / pseudo"
                 className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
               />
+            </label>
+            <label className="text-sm">
+              <span className="mb-1 block text-neutral-500">Genre</span>
+              <select
+                value={gender}
+                onChange={(e) => setGender(e.target.value)}
+                className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              >
+                <option value="">—</option>
+                <option value="H">H — {GENDER_LABEL.H}</option>
+                <option value="F">F — {GENDER_LABEL.F}</option>
+              </select>
             </label>
             <label className="text-sm">
               <span className="mb-1 block text-neutral-500">
@@ -610,6 +643,7 @@ function ScoresManager({ challenges, entries, onChange }) {
                 <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
                   <th className="px-2 py-1">Rang</th>
                   <th className="px-2 py-1">Nom</th>
+                  <th className="px-2 py-1">Genre</th>
                   <th className="px-2 py-1">Perf</th>
                   <th className="px-2 py-1">Points</th>
                   <th className="px-2 py-1">Vérifié par</th>
@@ -628,7 +662,7 @@ function ScoresManager({ challenges, entries, onChange }) {
                 ))}
                 {ranked.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-2 py-3 text-neutral-400">
+                    <td colSpan={7} className="px-2 py-3 text-neutral-400">
                       Aucune performance pour ce défi.
                     </td>
                   </tr>
@@ -646,6 +680,7 @@ function ScoresManager({ challenges, entries, onChange }) {
 function ScoreRow({ r, metric, onSave, onRemove }) {
   const [editing, setEditing] = useState(false);
   const [rawValue, setRawValue] = useState(r.raw_value);
+  const [gender, setGender] = useState(r.gender || "");
   const [verifiedBy, setVerifiedBy] = useState(r.verified_by || "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
@@ -665,7 +700,11 @@ function ScoreRow({ r, metric, onSave, onRemove }) {
     setBusy(true);
     const { error } = await supabase
       .from("entries")
-      .update({ raw_value: rawValue.trim(), verified_by: verifiedBy.trim() || null })
+      .update({
+        raw_value: rawValue.trim(),
+        gender: gender || null,
+        verified_by: verifiedBy.trim() || null,
+      })
       .eq("id", r.id);
     setBusy(false);
     if (error) { setErr(error.message); return; }
@@ -676,6 +715,7 @@ function ScoreRow({ r, metric, onSave, onRemove }) {
   const cancel = () => {
     setEditing(false);
     setRawValue(r.raw_value);
+    setGender(r.gender || "");
     setVerifiedBy(r.verified_by || "");
     setErr(null);
   };
@@ -685,6 +725,18 @@ function ScoreRow({ r, metric, onSave, onRemove }) {
       <tr className="border-t border-neutral-100">
         <td className="px-2 py-1.5 font-bold text-neutral-500">{r.rank}</td>
         <td className="px-2 py-1.5 font-semibold">{r.participant_name}</td>
+        <td className="px-2 py-1.5">
+          {r.gender ? (
+            <span
+              title={GENDER_LABEL[r.gender]}
+              className="rounded-full bg-bf-light px-2 py-0.5 text-xs font-bold text-bf-dark"
+            >
+              {r.gender}
+            </span>
+          ) : (
+            <span className="text-xs text-neutral-300">—</span>
+          )}
+        </td>
         <td className="px-2 py-1.5 text-neutral-600">{r.raw_value}</td>
         <td className="text-bf-dark px-2 py-1.5 font-extrabold">{r.points}</td>
         <td className="px-2 py-1.5 text-neutral-400 italic">{r.verified_by || "—"}</td>
@@ -710,6 +762,17 @@ function ScoreRow({ r, metric, onSave, onRemove }) {
     <tr className="border-t border-bf-orange/30 bg-bf-light/40">
       <td className="px-2 py-2 font-bold text-neutral-400">{r.rank}</td>
       <td className="px-2 py-2 font-semibold">{r.participant_name}</td>
+      <td className="px-2 py-2">
+        <select
+          value={gender}
+          onChange={(e) => setGender(e.target.value)}
+          className="rounded border border-neutral-300 px-1.5 py-1 text-sm"
+        >
+          <option value="">—</option>
+          <option value="H">H</option>
+          <option value="F">F</option>
+        </select>
+      </td>
       <td className="px-2 py-2">
         <input
           value={rawValue}

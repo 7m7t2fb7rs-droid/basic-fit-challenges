@@ -1,8 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { buildLeaderboard, rankChallenge, METRIC_LABEL } from "@/lib/scoring";
+import {
+  buildLeaderboard,
+  rankChallenge,
+  METRIC_LABEL,
+  GENDER_LABEL,
+  genderByParticipant,
+  filterEntriesByGender,
+} from "@/lib/scoring";
 import { fetchCountdownEnd, endOfDay, DEFAULT_COUNTDOWN_END } from "@/lib/settings";
 
 function useCountdown(target) {
@@ -52,13 +59,58 @@ function Countdown({ endDate }) {
 
 const MEDAL = ["🥇", "🥈", "🥉"];
 
+const FILTERS = [
+  { key: "all", label: "All" },
+  { key: "H", label: "H" },
+  { key: "F", label: "F" },
+];
+
+function GenderFilter({ value, onChange }) {
+  return (
+    <div className="inline-flex shrink-0 rounded-xl bg-bf-light p-0.5">
+      {FILTERS.map(({ key, label }) => (
+        <button
+          key={key}
+          type="button"
+          onClick={() => onChange(key)}
+          aria-pressed={value === key}
+          title={key === "all" ? "Tout le monde" : GENDER_LABEL[key]}
+          className={`rounded-lg px-3 py-1 text-xs font-extrabold transition ${
+            value === key
+              ? "bg-bf-orange text-white shadow-sm"
+              : "text-neutral-500 hover:text-bf-dark"
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [board, setBoard] = useState([]);
+  const [counting, setCounting] = useState([]);
   const [activeChallenges, setActiveChallenges] = useState([]);
   const [byCh, setByCh] = useState({});
   const [endDate, setEndDate] = useState(DEFAULT_COUNTDOWN_END);
+  const [filter, setFilter] = useState("all");
+
+  // Le genre est une propriété de la personne, déduite de ses scores.
+  const genderMap = useMemo(
+    () => genderByParticipant(Object.values(byCh).flat()),
+    [byCh]
+  );
+
+  // Filtre "H"/"F" : on écarte les scores des autres AVANT le calcul, donc le
+  // barème F1 est recalculé au sein du groupe (1er du groupe = 25 pts).
+  const board = useMemo(
+    () => buildLeaderboard(counting, filterEntriesByGender(byCh, filter, genderMap)),
+    [counting, byCh, filter, genderMap]
+  );
+
+  const hasGenderData = Object.keys(genderMap).length > 0;
 
   useEffect(() => {
     (async () => {
@@ -78,8 +130,7 @@ export default function HomePage() {
           (map[e.challenge_id] = map[e.challenge_id] || []).push(e);
         });
 
-        const counting = allCh.filter((c) => c.status !== "upcoming");
-        setBoard(buildLeaderboard(counting, map));
+        setCounting(allCh.filter((c) => c.status !== "upcoming"));
         setActiveChallenges(allCh.filter((c) => c.status === "active"));
         setByCh(map);
       } catch (err) {
@@ -104,7 +155,12 @@ export default function HomePage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-extrabold tracking-tight">Classement général</h1>
+        <div className="flex items-start gap-3">
+          <h1 className="text-2xl font-extrabold tracking-tight">Classement général</h1>
+          <div className="ml-auto">
+            <GenderFilter value={filter} onChange={setFilter} />
+          </div>
+        </div>
         <p className="mt-2 text-sm text-neutral-500">
           Pendant 3 mois, plusieurs défis sont proposés à la salle. Chaque participation rapporte des points et te permet de grimper au classement — le total ici reflète l&apos;ensemble de tes points sur tous les défis.
         </p>
@@ -114,9 +170,24 @@ export default function HomePage() {
       </div>
 
       {board.length === 0 ? (
-        <p className="rounded-xl bg-white p-6 text-neutral-500 shadow-sm">
-          Aucun score pour l&apos;instant. Reviens après le premier défi !
-        </p>
+        <div className="rounded-xl bg-white p-6 text-neutral-500 shadow-sm">
+          {filter === "all" ? (
+            <p>Aucun score pour l&apos;instant. Reviens après le premier défi !</p>
+          ) : (
+            <>
+              <p>
+                Aucun participant dans la catégorie{" "}
+                <span className="font-semibold">{GENDER_LABEL[filter]}</span>.
+              </p>
+              {!hasGenderData && (
+                <p className="mt-1 text-sm text-neutral-400">
+                  Le genre n&apos;a encore été renseigné sur aucun score — il se
+                  saisit depuis l&apos;espace admin.
+                </p>
+              )}
+            </>
+          )}
+        </div>
       ) : (
         <>
           {/* Podium — horizontal même sur mobile, compact */}
