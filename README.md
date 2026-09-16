@@ -14,7 +14,8 @@ Next.js (App Router) + Supabase, déployable sur Vercel.
 1. Va sur [supabase.com](https://supabase.com) → **New project** (note le mot de passe de la base).
 2. Menu **SQL Editor** → **New query** → colle tout le contenu de `supabase-schema.sql` → **Run**.
    Puis refais la même chose avec `supabase-settings.sql` (réglages : date de fin du compte à rebours)
-   et `supabase-participants.sql` (fiches des participants).
+   `supabase-participants.sql` (fiches des participants)
+   et `supabase-suggestions.sql` (propositions de défis anonymes).
    Ça crée les tables `challenges` et `entries` et les règles de sécurité.
 3. Menu **Project Settings → API** : copie **Project URL** et la clé **anon public**. On en a besoin à l'étape 3.
 
@@ -77,4 +78,5 @@ lib/
 supabase-schema.sql → tables + sécurité (à exécuter une fois)
 supabase-settings.sql → table des réglages, dont la date de fin du compte à rebours
 supabase-participants.sql → fiches participants (prénom, nom, genre) + lien avec les scores
+supabase-suggestions.sql  → propositions anonymes : écriture publique, lecture admin uniquement
 ```

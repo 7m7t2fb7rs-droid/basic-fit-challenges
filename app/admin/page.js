@@ -105,26 +105,38 @@ function LoginForm() {
 }
 
 /* ---------------------------- Dashboard --------------------------- */
+const TABS = [
+  { key: "scores", label: "Scores" },
+  { key: "challenges", label: "Défis" },
+  { key: "participants", label: "Participants" },
+  { key: "suggestions", label: "Suggestions" },
+  { key: "countdown", label: "Compte à rebours" },
+];
+
 function Dashboard({ email }) {
+  const [tab, setTab] = useState("scores");
   const [challenges, setChallenges] = useState([]);
   const [entries, setEntries] = useState([]);
   const [participants, setParticipants] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
 
   // Rechargement silencieux : on ne repasse pas par l'écran « Chargement… »,
   // sinon les formulaires en cours de saisie seraient démontés et vidés.
   const reload = useCallback(async () => {
-    const [chRes, enRes, paRes] = await Promise.all([
+    const [chRes, enRes, paRes, suRes] = await Promise.all([
       supabase.from("challenges").select("*").order("sort_order", { ascending: true }),
       supabase.from("entries").select("*"),
       supabase.from("participants").select("*"),
+      supabase.from("suggestions").select("*").order("created_at", { ascending: false }),
     ]);
-    const failed = chRes.error || enRes.error || paRes.error;
+    const failed = chRes.error || enRes.error || paRes.error || suRes.error;
     setLoadError(failed ? failed.message : null);
     setChallenges(chRes.data || []);
     setEntries(enRes.data || []);
     setParticipants(paRes.data || []);
+    setSuggestions(suRes.data || []);
     setLoading(false);
     // Le classement public garde ses données en mémoire : après une saisie,
     // il doit les relire plutôt que de resservir l'état d'avant.
@@ -135,47 +147,179 @@ function Dashboard({ email }) {
     reload();
   }, [reload]);
 
+  // Pastille sur l'onglet : le nombre de propositions non encore traitées.
+  const pending = suggestions.filter((x) => x.status === "new").length;
+
   return (
-    <div className="admin-dashboard space-y-8">
-      <div className="flex items-center">
+    <div className="admin-dashboard">
+      <div className="admin-head">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">Espace admin</h1>
-          <p className="text-sm text-neutral-500">Connecté : {email}</p>
+          <h1>Espace admin</h1>
+          <p className="admin-who">Connecté : {email}</p>
         </div>
-        <button
-          onClick={() => supabase.auth.signOut()}
-          className="ml-auto rounded-lg border border-neutral-300 px-3 py-2 text-sm font-semibold hover:bg-neutral-100"
-        >
+        <button onClick={() => supabase.auth.signOut()} className="admin-signout">
           Déconnexion
         </button>
       </div>
 
+      <nav className="admin-tabs" aria-label="Sections de l’administration">
+        {TABS.map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            aria-current={tab === key ? "page" : undefined}
+            className={tab === key ? "active" : ""}
+          >
+            {label}
+            {key === "suggestions" && pending > 0 && (
+              <span className="tab-badge">{pending}</span>
+            )}
+          </button>
+        ))}
+      </nav>
+
       {loadError && (
-        <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          Données incomplètes : {loadError}
-        </p>
+        <p className="admin-alert">Données incomplètes : {loadError}</p>
       )}
 
       {loading ? (
         <p className="text-neutral-500">Chargement…</p>
       ) : (
         <>
-          <CountdownManager />
-          <ScoresManager
-            challenges={challenges}
-            entries={entries}
-            participants={participants}
-            onChange={reload}
-          />
-          <ParticipantsManager
-            participants={participants}
-            entries={entries}
-            onChange={reload}
-          />
-          <ChallengesManager challenges={challenges} onChange={reload} />
+          {tab === "scores" && (
+            <ScoresManager
+              challenges={challenges}
+              entries={entries}
+              participants={participants}
+              onChange={reload}
+            />
+          )}
+          {tab === "challenges" && (
+            <ChallengesManager challenges={challenges} onChange={reload} />
+          )}
+          {tab === "participants" && (
+            <ParticipantsManager
+              participants={participants}
+              entries={entries}
+              onChange={reload}
+            />
+          )}
+          {tab === "suggestions" && (
+            <SuggestionsManager suggestions={suggestions} onChange={reload} />
+          )}
+          {tab === "countdown" && <CountdownManager />}
         </>
       )}
     </div>
+  );
+}
+
+/* ------------------ Suggestions de défis (anonymes) ---------------- */
+/*  Déposées depuis la page publique. Personne d'autre que les admins    */
+/*  ne peut les lire : la table n'autorise pas la lecture au visiteur.   */
+const SUGGESTION_STATUS = {
+  new: { label: "À trier", cls: "sug-new" },
+  kept: { label: "Retenue", cls: "sug-kept" },
+  declined: { label: "Écartée", cls: "sug-declined" },
+};
+
+function SuggestionsManager({ suggestions, onChange }) {
+  const [filter, setFilter] = useState("new");
+
+  const counts = {
+    new: suggestions.filter((x) => x.status === "new").length,
+    kept: suggestions.filter((x) => x.status === "kept").length,
+    declined: suggestions.filter((x) => x.status === "declined").length,
+  };
+  const shown = suggestions.filter((x) => x.status === filter);
+
+  const setStatus = async (id, status) => {
+    const { error } = await supabase.from("suggestions").update({ status }).eq("id", id);
+    if (error) return alert(error.message);
+    onChange();
+  };
+
+  const remove = async (id) => {
+    if (!confirm("Supprimer définitivement cette proposition ?")) return;
+    const { error } = await supabase.from("suggestions").delete().eq("id", id);
+    if (error) return alert(error.message);
+    onChange();
+  };
+
+  return (
+    <section className="rounded-2xl bg-white p-5 shadow-sm">
+      <h2 className="text-lg font-bold">Suggestions de défis</h2>
+      <p className="mb-4 text-sm text-neutral-500">
+        Déposées anonymement depuis la page des défis. Aucune information sur
+        l’auteur n’est enregistrée — inutile de chercher qui a proposé quoi.
+      </p>
+
+      <div className="sug-filters">
+        {Object.entries(SUGGESTION_STATUS).map(([key, { label }]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setFilter(key)}
+            aria-pressed={filter === key}
+            className={filter === key ? "active" : ""}
+          >
+            {label} ({counts[key]})
+          </button>
+        ))}
+      </div>
+
+      {shown.length === 0 ? (
+        <p className="mt-4 text-sm text-neutral-400">
+          {filter === "new"
+            ? "Aucune proposition en attente."
+            : `Aucune proposition dans « ${SUGGESTION_STATUS[filter].label} ».`}
+        </p>
+      ) : (
+        <ul className="sug-list">
+          {shown.map((x) => (
+            <li key={x.id} className="sug-item">
+              <div className="sug-item-head">
+                <strong>{x.title}</strong>
+                <span className={`sug-badge ${SUGGESTION_STATUS[x.status].cls}`}>
+                  {SUGGESTION_STATUS[x.status].label}
+                </span>
+              </div>
+              {x.details && <p className="sug-details">{x.details}</p>}
+              <div className="sug-item-foot">
+                <span className="sug-date">
+                  {new Date(x.created_at).toLocaleDateString("fr-FR", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </span>
+                <div className="sug-actions">
+                  {x.status !== "kept" && (
+                    <button type="button" onClick={() => setStatus(x.id, "kept")}>
+                      Retenir
+                    </button>
+                  )}
+                  {x.status !== "declined" && (
+                    <button type="button" onClick={() => setStatus(x.id, "declined")}>
+                      Écarter
+                    </button>
+                  )}
+                  {x.status !== "new" && (
+                    <button type="button" onClick={() => setStatus(x.id, "new")}>
+                      Remettre à trier
+                    </button>
+                  )}
+                  <button type="button" className="danger" onClick={() => remove(x.id)}>
+                    Supprimer
+                  </button>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

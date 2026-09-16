@@ -100,7 +100,62 @@ input, select, textarea { font-size:max(16px,1em); accent-color:var(--orange); }
 .site-footer { max-width:1160px; margin:auto; border-top:1px solid var(--line); padding:25px 0 40px; display:flex; align-items:center; justify-content:space-between; gap:18px; font-size:9px; color:var(--muted); }.footer-brand { font-weight:900; color:var(--ink); letter-spacing:1px; }
 .page-hero { padding:25px 0 35px; border-bottom:1px solid var(--line); }.page-hero>.eyebrow { color:#ad3c0c; }.page-hero h1 { font-size:clamp(48px,7vw,80px); line-height:1.1; margin:15px 0; }.page-hero p:last-child { font-size:13px; color:var(--muted); line-height:1.8; }
 .challenge-page section.rounded-2xl { border:1px solid var(--line); border-radius:8px; box-shadow:none; padding:28px; background:var(--card); }.challenge-page section h2 { font-size:24px; letter-spacing:-.6px; }.challenge-page table th { padding-top:12px; padding-bottom:12px; color:#696d60; font-size:9px; }.challenge-page table td { padding-top:14px; padding-bottom:14px; }.challenge-page .text-neutral-400 { color:#717569; }.challenge-page .bg-white { background:var(--card); }
+/* Espace admin : en-tête, onglets, suggestions */
+.admin-dashboard { display:flex; flex-direction:column; gap:22px; }
+.admin-head { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.admin-who { font-size:11px; color:var(--muted); margin-top:4px; }
+.admin-signout { margin-left:auto; border:1px solid var(--line); border-radius:5px; padding:9px 14px; font-size:11px; font-weight:700; background:var(--card); }
+.admin-signout:hover { background:var(--surface); }
+.admin-alert { border:1px solid #f0b7a0; background:#fdeee7; border-radius:7px; padding:12px 15px; font-size:12px; color:#9c3910; }
+.admin-tabs { display:flex; gap:4px; overflow-x:auto; border-bottom:1px solid var(--line); padding-bottom:0; scrollbar-width:none; }
+.admin-tabs::-webkit-scrollbar { display:none; }
+.admin-tabs button { display:inline-flex; align-items:center; gap:7px; white-space:nowrap; padding:13px 15px; font-size:12px; font-weight:700; color:var(--muted); border-bottom:2px solid transparent; margin-bottom:-1px; }
+.admin-tabs button:hover { color:var(--ink); }
+.admin-tabs button.active { color:var(--ink); border-bottom-color:var(--orange); }
+.tab-badge { display:inline-grid; place-items:center; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--orange); color:#fff; font-size:10px; font-weight:800; }
+.sug-filters { display:flex; gap:4px; padding:3px; background:var(--surface); border-radius:5px; align-self:flex-start; width:fit-content; flex-wrap:wrap; }
+.sug-filters button { padding:9px 12px; font-size:11px; font-weight:700; border-radius:3px; color:var(--muted); }
+.sug-filters button.active { background:var(--ink); color:#fff; }
+.sug-list { display:flex; flex-direction:column; gap:12px; margin-top:18px; }
+.sug-item { border:1px solid var(--line); border-radius:7px; padding:16px 18px; background:var(--card); }
+.sug-item-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.sug-item-head strong { font-size:14px; font-weight:800; line-height:1.4; overflow-wrap:anywhere; }
+.sug-badge { flex-shrink:0; font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.8px; padding:4px 8px; border-radius:20px; }
+.sug-new { background:#ffe3d3; color:#a63c0c; }
+.sug-kept { background:#e0eed7; color:#3f6330; }
+.sug-declined { background:#eaeae2; color:#6c6e62; }
+.sug-details { font-size:12px; line-height:1.75; color:var(--muted); margin-top:9px; white-space:pre-wrap; overflow-wrap:anywhere; }
+.sug-item-foot { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-top:14px; padding-top:13px; border-top:1px solid #eeeee7; }
+.sug-date { font-size:10px; color:var(--muted); }
+.sug-actions { display:flex; gap:14px; flex-wrap:wrap; margin-left:auto; }
+.sug-actions button { font-size:11px; font-weight:700; color:var(--ink); }
+.sug-actions button:hover { text-decoration:underline; }
+.sug-actions .danger { color:#b3310d; }
+
 .login-panel { max-width:450px; margin:35px auto 60px; }.login-panel h1 { font-size:40px; letter-spacing:-1.5px; margin:13px 0; }.login-panel form { margin-top:25px; padding:28px; border:1px solid var(--line); box-shadow:none; border-radius:8px; }.login-panel label { display:block; font-size:11px; font-weight:700; padding:9px 0 6px; }.login-panel input { min-height:47px; background:#fafaf5; }.login-panel button { min-height:48px; }.admin-dashboard section { border:1px solid var(--line); box-shadow:none; }.admin-dashboard h1 { font-size:36px; letter-spacing:-1px; }.admin-dashboard input,.admin-dashboard select { min-height:42px; }
+
+/* Bannière « propose un défi » sur la page des défis */
+.suggest-banner { border:1px solid var(--line); border-radius:8px; background:var(--surface); padding:22px 24px; margin:24px 0 32px; }
+.suggest-intro { display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; }
+.suggest-intro .eyebrow { color:#8a4a1f; }
+.suggest-intro strong { display:block; font-size:19px; font-weight:800; letter-spacing:-.4px; margin-top:6px; }
+.suggest-intro p { font-size:11px; color:var(--muted); line-height:1.7; margin-top:5px; max-width:430px; }
+.suggest-intro .primary-link { margin-top:0; flex-shrink:0; }
+.suggest-form { margin-top:20px; padding-top:20px; border-top:1px solid #d3d3c6; }
+.suggest-form label { display:block; font-size:11px; font-weight:700; padding:0 0 6px; }
+.suggest-form label span { font-weight:400; color:var(--muted); }
+.suggest-form input, .suggest-form textarea { width:100%; border:1px solid var(--line); border-radius:5px; background:var(--card); padding:11px 12px; font:inherit; font-size:13px; margin-bottom:15px; min-height:46px; }
+.suggest-form textarea { resize:vertical; line-height:1.6; }
+.suggest-actions { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.suggest-actions .primary-link { margin-top:0; }
+.suggest-actions .text-link { margin-top:0; display:inline; }
+.suggest-count { margin-left:auto; font-size:10px; color:var(--muted); font-variant-numeric:tabular-nums; }
+.suggest-error { margin-top:12px; font-size:12px; color:#b3310d; font-weight:700; }
+.suggest-done { display:flex; align-items:center; justify-content:space-between; gap:18px; flex-wrap:wrap; border-color:#b6cfa8; background:#e9f0e2; }
+.suggest-done strong { font-size:17px; font-weight:800; }
+.suggest-done p { font-size:11px; color:#4c5a43; margin-top:5px; }
+.suggest-done .text-link { margin-top:0; }
+@media(max-width:760px) { .suggest-banner { padding:19px 18px; } .suggest-intro .primary-link { width:100%; justify-content:center; } .suggest-intro strong { font-size:17px; } }
 
 /* Fiche d'un participant — ouverte au clic sur un nom du classement */
 .sheet-backdrop { position:fixed; inset:0; z-index:60; background:rgba(28,29,24,.45); display:flex; align-items:center; justify-content:center; padding:20px; }

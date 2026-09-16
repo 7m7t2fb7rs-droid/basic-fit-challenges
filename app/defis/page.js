@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
 import { useData } from "@/lib/store";
 import {
   rankChallenge,
@@ -21,6 +22,131 @@ function StatusBadge({ status }) {
     <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${styles[status] ?? "bg-neutral-100 text-neutral-600"}`}>
       {STATUS_LABEL[status]}
     </span>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Bannière « propose un défi » — dépôt anonyme                       */
+/*  Rien n'est enregistré sur l'auteur : ni nom, ni adresse IP.        */
+/*  Les propositions ne sont lisibles que depuis l'espace admin.       */
+/* ------------------------------------------------------------------ */
+const TITLE_MAX = 120;
+const DETAILS_MAX = 1000;
+const COOLDOWN_MS = 30_000;
+
+function SuggestionBanner() {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [details, setDetails] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    const t = title.trim();
+    if (t.length < 3) {
+      setErr("Donne un titre d’au moins 3 caractères.");
+      return;
+    }
+    // Garde-fou contre le double-envoi et le remplissage en rafale.
+    try {
+      const last = Number(localStorage.getItem("suggestion-sent-at") || 0);
+      if (Date.now() - last < COOLDOWN_MS) {
+        setErr("Tu viens déjà d’envoyer une idée — laisse passer quelques secondes.");
+        return;
+      }
+    } catch {
+      // navigation privée : on laisse passer, la base a ses propres limites
+    }
+    setErr(null);
+    setBusy(true);
+    const { error } = await supabase
+      .from("suggestions")
+      .insert({ title: t, details: details.trim() || null });
+    setBusy(false);
+    if (error) {
+      setErr("L’envoi n’a pas abouti. Réessaie dans un instant.");
+      return;
+    }
+    try {
+      localStorage.setItem("suggestion-sent-at", String(Date.now()));
+    } catch {}
+    setTitle("");
+    setDetails("");
+    setSent(true);
+  };
+
+  if (sent) {
+    return (
+      <div className="suggest-banner suggest-done" role="status">
+        <div>
+          <strong>Merci, c’est noté.</strong>
+          <p>Ton idée part directement à l’équipe. Elle reste anonyme.</p>
+        </div>
+        <button type="button" className="text-link" onClick={() => setSent(false)}>
+          Proposer autre chose
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="suggest-banner">
+      <div className="suggest-intro">
+        <div>
+          <span className="eyebrow">Une idée&nbsp;?</span>
+          <strong>Propose le prochain défi.</strong>
+          <p>Anonyme — on ne garde ni ton nom ni rien qui permette de te reconnaître.</p>
+        </div>
+        {!open && (
+          <button type="button" className="primary-link" onClick={() => setOpen(true)}>
+            Proposer un défi
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <form onSubmit={submit} className="suggest-form">
+          <label htmlFor="suggest-title">Le défi</label>
+          <input
+            id="suggest-title"
+            required
+            maxLength={TITLE_MAX}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Ex. Gainage planche, Burpees en 2 min…"
+          />
+          <label htmlFor="suggest-details">
+            Des précisions <span>(facultatif)</span>
+          </label>
+          <textarea
+            id="suggest-details"
+            rows={3}
+            maxLength={DETAILS_MAX}
+            value={details}
+            onChange={(e) => setDetails(e.target.value)}
+            placeholder="Comment on le mesure, une règle particulière…"
+          />
+          <div className="suggest-actions">
+            <button className="primary-link" disabled={busy}>
+              {busy ? "Envoi…" : "Envoyer"}
+            </button>
+            <button type="button" className="text-link" onClick={() => setOpen(false)}>
+              Annuler
+            </button>
+            <span className="suggest-count">
+              {details.length}/{DETAILS_MAX}
+            </span>
+          </div>
+          {err && (
+            <p className="suggest-error" role="alert">
+              {err}
+            </p>
+          )}
+        </form>
+      )}
+    </div>
   );
 }
 
@@ -80,6 +206,8 @@ export default function DefisPage() {
           Trouve ton prochain challenge. Découvre les performances du club et les records à dépasser.
         </p>
       </div>
+
+      <SuggestionBanner />
 
       {current.map((c) => {
         const ranked = rankChallenge(entriesByCh[c.id] || [], c.metric);
