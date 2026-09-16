@@ -102,18 +102,21 @@ function Dashboard({ email }) {
   const [entries, setEntries] = useState([]);
   const [participants, setParticipants] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
 
+  // Rechargement silencieux : on ne repasse pas par l'écran « Chargement… »,
+  // sinon les formulaires en cours de saisie seraient démontés et vidés.
   const reload = useCallback(async () => {
-    setLoading(true);
-    const { data: ch } = await supabase
-      .from("challenges")
-      .select("*")
-      .order("sort_order", { ascending: true });
-    const { data: en } = await supabase.from("entries").select("*");
-    const { data: pa } = await supabase.from("participants").select("*");
-    setChallenges(ch || []);
-    setEntries(en || []);
-    setParticipants(pa || []);
+    const [chRes, enRes, paRes] = await Promise.all([
+      supabase.from("challenges").select("*").order("sort_order", { ascending: true }),
+      supabase.from("entries").select("*"),
+      supabase.from("participants").select("*"),
+    ]);
+    const failed = chRes.error || enRes.error || paRes.error;
+    setLoadError(failed ? failed.message : null);
+    setChallenges(chRes.data || []);
+    setEntries(enRes.data || []);
+    setParticipants(paRes.data || []);
     setLoading(false);
   }, []);
 
@@ -135,6 +138,12 @@ function Dashboard({ email }) {
           Déconnexion
         </button>
       </div>
+
+      {loadError && (
+        <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          Données incomplètes : {loadError}
+        </p>
+      )}
 
       {loading ? (
         <p className="text-neutral-500">Chargement…</p>
@@ -763,6 +772,12 @@ function ParticipantPicker({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
 
+  // Quand le parent remet la sélection à zéro (score ajouté), on repart
+  // d'une recherche vide plutôt que de rester sur l'ancien prénom tapé.
+  useEffect(() => {
+    if (!value) setQuery("");
+  }, [value]);
+
   const picked = participants.find((p) => p.id === value) || null;
   const matches = picked ? [] : matchParticipants(participants, query).slice(0, 6);
   const noMatch = !picked && query.trim() && matches.length === 0;
@@ -800,7 +815,9 @@ function ParticipantPicker({
     if (error) return setErr(error.message);
     setCreating(null);
     setQuery("");
-    onCreated?.();
+    // On attend le rechargement : sinon la fiche tout juste créée n'est pas
+    // encore dans la liste et le panneau clignote sur « aucune correspondance ».
+    await onCreated?.();
     onChange(data.id);
   };
 

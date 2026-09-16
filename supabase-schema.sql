@@ -21,6 +21,7 @@ create table if not exists public.entries (
   challenge_id     uuid not null references public.challenges(id) on delete cascade,
   participant_name text not null,
   raw_value        text not null,           -- "2:40" (temps) ou "42" (répétitions)
+  verified_by      text,                    -- qui a validé la perf (optionnel)
   created_at       timestamptz not null default now()
 );
 

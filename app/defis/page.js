@@ -79,10 +79,18 @@ export default function DefisPage() {
     .filter((c) => c.status !== "upcoming")
     .sort(byRecentFirst);
 
-  // Les défis à venir restent dans l'ordre chronologique : le prochain d'abord.
+  // Les défis à venir restent dans l'ordre chronologique : le prochain d'abord,
+  // et ceux dont la date n'est pas encore fixée à la fin.
+  const bySoonestFirst = (a, b) => {
+    if (a.end_date && b.end_date) return a.end_date.localeCompare(b.end_date);
+    if (a.end_date) return -1;
+    if (b.end_date) return 1;
+    return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+  };
+
   const upcoming = challenges
     .filter((c) => c.status === "upcoming")
-    .sort((a, b) => -byRecentFirst(a, b));
+    .sort(bySoonestFirst);
 
   return (
     <div className="space-y-8">
