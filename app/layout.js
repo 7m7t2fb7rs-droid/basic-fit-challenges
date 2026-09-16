@@ -15,7 +15,7 @@ export default function RootLayout({ children }) {
         <footer className="site-footer">
           <span className="footer-brand">BASIC FIT CHALLENGES</span>
           <span>Un club. Des défis. Ton meilleur niveau.</span>
-          <span>À toi de jouer ↗</span>
+          <span>À toi de jouer</span>
         </footer>
       </body>
     </html>

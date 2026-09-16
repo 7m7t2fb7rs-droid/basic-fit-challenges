@@ -10,8 +10,8 @@ export default function Nav() {
     <header className="site-header"><div className="header-inner">
       <Link href="/" className="brand" aria-label="Basic Fit Challenges — accueil"><span className="brand-mark" aria-hidden="true">b.</span><span className="brand-name">BASIC FIT<span>CHALLENGES CLUB</span></span></Link>
       <nav className="desktop-nav" aria-label="Navigation principale">{tabs.map(({ href, label, number }) => <Link key={href} href={href} aria-current={active(href) ? "page" : undefined} className={active(href) ? "nav-link active" : "nav-link"}><small>{number}</small>{label}</Link>)}</nav>
-      <Link href="/admin" className="admin-link" aria-current={active("/admin") ? "page" : undefined}>Espace équipe <span aria-hidden="true">↗</span></Link>
+      <Link href="/admin" className="admin-link" aria-current={active("/admin") ? "page" : undefined}>Espace équipe</Link>
     </div></header>
-    <nav className="mobile-nav" aria-label="Navigation mobile">{tabs.map(({ href, label, number }) => <Link key={href} href={href} aria-current={active(href) ? "page" : undefined} className={active(href) ? "active" : ""}><span>{number}</span>{label}<span aria-hidden="true">↗</span></Link>)}</nav>
+    <nav className="mobile-nav" aria-label="Navigation mobile">{tabs.map(({ href, label, number }) => <Link key={href} href={href} aria-current={active(href) ? "page" : undefined} className={active(href) ? "active" : ""}><span>{number}</span>{label}</Link>)}</nav>
   </>;
 }
