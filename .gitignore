@@ -5,3 +5,7 @@ out
 .env.local
 .DS_Store
 npm-debug.log*
+.vercel
+
+# Fichiers de travail qui peuvent contenir des noms de membres
+*.xlsx

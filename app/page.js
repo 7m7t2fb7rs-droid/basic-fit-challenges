@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useData } from "@/lib/store";
 import {
   buildLeaderboard,
@@ -65,7 +65,7 @@ function Countdown({ endDate }) {
 
 function GenderFilter({ value, onChange }) {
   return (
-    <div className="filter-tabs" aria-label="Catégorie du classement">
+    <div className="filter-tabs" role="group" aria-label="Catégorie du classement">
       {[["all", "Tous"], ["H", "Hommes"], ["F", "Femmes"]].map(([key, label]) => (
         <button key={key} type="button" onClick={() => onChange(key)} aria-pressed={value === key}>
           {label}
@@ -79,9 +79,34 @@ function GenderFilter({ value, onChange }) {
 /*  Fiche d'un participant : ses défis et ses performances            */
 /* ------------------------------------------------------------------ */
 function ParticipantSheet({ person, rows, onClose }) {
-  // Échap ferme la fiche, et on bloque le défilement derrière.
+  const sheetRef = useRef(null);
+  const closeRef = useRef(null);
+
+  // À l'ouverture, le focus entre dans la fiche ; à la fermeture, il revient
+  // sur le nom qui l'a ouverte. Indispensable au clavier et au lecteur d'écran.
   useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && onClose();
+    const opener = document.activeElement;
+    closeRef.current?.focus();
+    return () => opener?.focus?.();
+  }, []);
+
+  // Échap ferme la fiche, Tab reste à l'intérieur, et on bloque le
+  // défilement derrière.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") return onClose();
+      if (e.key !== "Tab" || !sheetRef.current) return;
+      const focusable = sheetRef.current.querySelectorAll("a[href], button");
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
     document.addEventListener("keydown", onKey);
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -94,6 +119,7 @@ function ParticipantSheet({ person, rows, onClose }) {
   return (
     <div className="sheet-backdrop" onClick={onClose}>
       <div
+        ref={sheetRef}
         className="sheet"
         role="dialog"
         aria-modal="true"
@@ -105,7 +131,13 @@ function ParticipantSheet({ person, rows, onClose }) {
             <span className="eyebrow">Rang {String(person.rank).padStart(2, "0")}</span>
             <h2 id="sheet-name">{person.name}</h2>
           </div>
-          <button type="button" className="sheet-close" onClick={onClose} aria-label="Fermer la fiche">
+          <button
+            ref={closeRef}
+            type="button"
+            className="sheet-close"
+            onClick={onClose}
+            aria-label="Fermer la fiche"
+          >
             ×
           </button>
         </div>

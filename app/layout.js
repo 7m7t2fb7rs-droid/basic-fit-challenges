@@ -1,8 +1,11 @@
 import "./globals.css";
+import Link from "next/link";
 import Nav from "./Nav";
 import { DataProvider } from "@/lib/store";
 
 export const metadata = {
+  // Sert de base aux liens absolus des aperçus de partage (WhatsApp, etc.).
+  metadataBase: new URL("https://basic-challenges.vercel.app"),
   title: "Challenges Basic Fit",
   description: "Classement des défis — Accroche-toi, Dépasse-toi",
   applicationName: "Challenges Basic Fit",
@@ -13,6 +16,16 @@ export const metadata = {
     title: "Challenges",
     statusBarStyle: "default",
   },
+  // Aperçu affiché quand on partage le lien.
+  openGraph: {
+    type: "website",
+    locale: "fr_FR",
+    siteName: "Challenges Basic Fit",
+    title: "Challenges Basic Fit — le classement des défis",
+    description: "Accroche-toi, Dépasse-toi : le classement des défis du club.",
+    images: [{ url: "/icon-512.png", width: 512, height: 512, alt: "Logo Basic Fit Challenges" }],
+  },
+  twitter: { card: "summary" },
   // Évite que Safari transforme les scores en numéros de téléphone.
   formatDetection: { telephone: false },
 };
@@ -37,6 +50,9 @@ export default function RootLayout({ children }) {
           <footer className="site-footer">
             <span className="footer-brand">BASIC FIT CHALLENGES</span>
             <span>Un club. Des défis. Ton meilleur niveau.</span>
+            <Link href="/mentions-legales" className="footer-link">
+              Mentions légales &amp; confidentialité
+            </Link>
             <span>À toi de jouer</span>
           </footer>
         </DataProvider>

@@ -52,6 +52,27 @@ export default function AdminPage() {
   return <Dashboard email={session.user.email} />;
 }
 
+/* Messages d'erreur Supabase (en anglais) → phrases compréhensibles. */
+function loginErrorText(error) {
+  const msg = (error?.message || "").toLowerCase();
+  if (error?.status === 429 || msg.includes("rate limit") || msg.includes("too many"))
+    return "Trop de tentatives. Patiente quelques minutes avant de réessayer.";
+  if (msg.includes("invalid login") || msg.includes("invalid credentials"))
+    return "Adresse e-mail ou mot de passe incorrect.";
+  if (msg.includes("email not confirmed"))
+    return "Ce compte n’a pas encore été confirmé.";
+  if (msg.includes("fetch") || msg.includes("network"))
+    return "Connexion impossible : vérifie ta connexion internet.";
+  return "La connexion a échoué. Réessaie dans un instant.";
+}
+
+/* Erreurs d'écriture : on traduit les cas attendus, sinon message brut. */
+function writeErrorText(error) {
+  if (error?.code === "23505") return "Cette personne a déjà un score sur ce défi.";
+  if (error?.code === "42501") return "Ton compte n’a pas les droits d’administration.";
+  return error?.message || "L’enregistrement a échoué.";
+}
+
 /* ------------------------------ Login ----------------------------- */
 function LoginForm() {
   const [email, setEmail] = useState("");
@@ -64,7 +85,7 @@ function LoginForm() {
     setBusy(true);
     setError(null);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setError(error.message);
+    if (error) setError(loginErrorText(error));
     setBusy(false);
   };
 
@@ -98,7 +119,11 @@ function LoginForm() {
           onChange={(e) => setPassword(e.target.value)}
           className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
         />
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && (
+          <p className="text-sm text-red-600" role="alert">
+            {error}
+          </p>
+        )}
         <button
           disabled={busy}
           className="w-full rounded-lg bg-bf-orange px-4 py-2 font-semibold text-white disabled:opacity-60"
@@ -106,7 +131,7 @@ function LoginForm() {
           {busy ? "Connexion…" : "Se connecter"}
         </button>
       </form>
-      <p className="mt-3 text-xs text-neutral-400">
+      <p className="mt-3 text-xs text-neutral-500">
         Accès réservé à l’équipe qui organise les challenges.
       </p>
     </div>
@@ -355,7 +380,7 @@ function GymManager() {
         <div className="gym-actions">
           <label className="text-sm">
             <span className="mb-1 block text-neutral-500">
-              Réouverture prévue <span className="text-neutral-400">(facultatif)</span>
+              Réouverture prévue <span className="text-neutral-500">(facultatif)</span>
             </span>
             <input
               type="datetime-local"
@@ -408,12 +433,14 @@ function GymManager() {
               <>
                 <input
                   type="time"
+                  aria-label={`Ouverture le ${long.toLowerCase()}`}
                   value={hours[key][0]}
                   onChange={(e) => setDay(key, 0, e.target.value)}
                 />
                 <span className="gym-day-sep">à</span>
                 <input
                   type="time"
+                  aria-label={`Fermeture le ${long.toLowerCase()}`}
                   value={hours[key][1]}
                   onChange={(e) => setDay(key, 1, e.target.value)}
                 />
@@ -494,7 +521,7 @@ function SuggestionsManager({ suggestions, onChange }) {
       </div>
 
       {shown.length === 0 ? (
-        <p className="mt-4 text-sm text-neutral-400">
+        <p className="mt-4 text-sm text-neutral-500">
           {filter === "new"
             ? "Aucune proposition en attente."
             : `Aucune proposition dans « ${SUGGESTION_STATUS[filter].label} ».`}
@@ -597,7 +624,7 @@ function CountdownManager() {
       </p>
 
       {loading ? (
-        <p className="text-sm text-neutral-400">Chargement…</p>
+        <p className="text-sm text-neutral-500">Chargement…</p>
       ) : (
         <>
           <form onSubmit={save} className="flex flex-wrap items-end gap-2">
@@ -669,7 +696,12 @@ function ChallengesManager({ challenges, onChange }) {
   const create = async (e) => {
     e.preventDefault();
     setBusy(true);
-    const payload = { ...form, end_date: form.end_date || null };
+    const payload = {
+      ...form,
+      name: form.name.trim(),
+      description: form.description.trim() || null,
+      end_date: form.end_date || null,
+    };
     const { error } = await supabase.from("challenges").insert(payload);
     setBusy(false);
     if (error) return alert(error.message);
@@ -700,12 +732,14 @@ function ChallengesManager({ challenges, onChange }) {
         </div>
         <input
           required
+          aria-label="Nom du défi"
           placeholder="Nom (ex. Pompes)"
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
           className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
         />
         <input
+          aria-label="Description"
           placeholder="Description (optionnel)"
           value={form.description}
           onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -781,7 +815,12 @@ function ChallengeRow({ challenge, onChange }) {
     const { id, created_at, ...rest } = c;
     const { error } = await supabase
       .from("challenges")
-      .update({ ...rest, end_date: rest.end_date || null })
+      .update({
+        ...rest,
+        name: rest.name.trim(),
+        description: rest.description.trim() || null,
+        end_date: rest.end_date || null,
+      })
       .eq("id", challenge.id);
     setBusy(false);
     if (error) return alert(error.message);
@@ -831,18 +870,21 @@ function ChallengeRow({ challenge, onChange }) {
   return (
     <div className="grid gap-2 rounded-xl border border-bf-orange/40 bg-bf-light/40 p-3 sm:grid-cols-2">
       <input
+        aria-label="Nom du défi"
         value={c.name}
         onChange={(e) => setC({ ...c, name: e.target.value })}
         className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
       />
       <input
         value={c.description}
+        aria-label="Description"
         placeholder="Description"
         onChange={(e) => setC({ ...c, description: e.target.value })}
         className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
       />
       <select
         value={c.metric}
+        aria-label="Mesuré en"
         onChange={(e) => setC({ ...c, metric: e.target.value })}
         className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
       >
@@ -851,6 +893,7 @@ function ChallengeRow({ challenge, onChange }) {
       </select>
       <select
         value={c.status}
+        aria-label="Statut"
         onChange={(e) => setC({ ...c, status: e.target.value })}
         className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
       >
@@ -861,12 +904,14 @@ function ChallengeRow({ challenge, onChange }) {
       <input
         type="date"
         value={c.end_date}
+        aria-label="Date de fin"
         onChange={(e) => setC({ ...c, end_date: e.target.value })}
         className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
       />
       <input
         type="number"
         value={c.sort_order}
+        aria-label="Ordre d’affichage"
         onChange={(e) => setC({ ...c, sort_order: Number(e.target.value) })}
         className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
       />
@@ -946,7 +991,7 @@ function ParticipantsManager({ participants, entries, onChange }) {
           />
         ))}
         {sorted.length === 0 && (
-          <p className="text-sm text-neutral-400">Aucune fiche pour l&apos;instant.</p>
+          <p className="text-sm text-neutral-500">Aucune fiche pour l&apos;instant.</p>
         )}
       </div>
 
@@ -959,18 +1004,21 @@ function ParticipantsManager({ participants, entries, onChange }) {
         </div>
         <input
           required
+          aria-label="Prénom"
           placeholder="Prénom"
           value={form.first_name}
           onChange={(e) => setForm({ ...form, first_name: e.target.value })}
           className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
         />
         <input
+          aria-label="Nom de famille"
           placeholder="Nom (si homonyme)"
           value={form.last_name}
           onChange={(e) => setForm({ ...form, last_name: e.target.value })}
           className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
         />
         <select
+          aria-label="Genre"
           value={form.gender}
           onChange={(e) => setForm({ ...form, gender: e.target.value })}
           className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
@@ -1070,7 +1118,7 @@ function ParticipantRow({ participant, scores, onChange }) {
             genre à renseigner
           </span>
         )}
-        <span className="text-xs text-neutral-400">
+        <span className="text-xs text-neutral-500">
           {scores} score{scores > 1 ? "s" : ""}
         </span>
         <div className="ml-auto flex gap-2">
@@ -1095,17 +1143,20 @@ function ParticipantRow({ participant, scores, onChange }) {
     <div className="grid gap-2 rounded-xl border border-bf-orange/40 bg-bf-light/40 p-3 sm:grid-cols-3">
       <input
         value={p.first_name}
+        aria-label="Prénom"
         placeholder="Prénom"
         onChange={(e) => setP({ ...p, first_name: e.target.value })}
         className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
       />
       <input
         value={p.last_name}
+        aria-label="Nom de famille"
         placeholder="Nom (si homonyme)"
         onChange={(e) => setP({ ...p, last_name: e.target.value })}
         className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
       />
       <select
+        aria-label="Genre"
         value={p.gender}
         onChange={(e) => setP({ ...p, gender: e.target.value })}
         className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
@@ -1245,7 +1296,7 @@ function ParticipantPicker({
             <ul className="mt-1 space-y-0.5">
               {list.map((e) => (
                 <li key={e.id} className="flex gap-2 text-neutral-600">
-                  <span className="text-neutral-400">{chName(e.challenge_id)}</span>
+                  <span className="text-neutral-500">{chName(e.challenge_id)}</span>
                   <span className="font-semibold">{e.raw_value}</span>
                 </li>
               ))}
@@ -1264,18 +1315,21 @@ function ParticipantPicker({
         </div>
         <input
           autoFocus
+          aria-label="Prénom"
           placeholder="Prénom"
           value={creating.first_name}
           onChange={(e) => setCreating({ ...creating, first_name: e.target.value })}
           className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
         />
         <input
+          aria-label="Nom de famille"
           placeholder="Nom (si homonyme)"
           value={creating.last_name}
           onChange={(e) => setCreating({ ...creating, last_name: e.target.value })}
           className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
         />
         <select
+          aria-label="Genre"
           value={creating.gender}
           onChange={(e) => setCreating({ ...creating, gender: e.target.value })}
           className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
@@ -1311,6 +1365,7 @@ function ParticipantPicker({
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        aria-label="Rechercher un participant"
         placeholder="Tape un prénom…"
         className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm sm:w-72"
       />
@@ -1335,7 +1390,7 @@ function ParticipantPicker({
                       {p.gender}
                     </span>
                   )}
-                  <span className="ml-auto text-xs text-neutral-400">
+                  <span className="ml-auto text-xs text-neutral-500">
                     {n} score{n > 1 ? "s" : ""}
                     {dup && (
                       <span className="ml-1 font-semibold text-amber-600">
@@ -1413,7 +1468,7 @@ function ScoresManager({ challenges, entries, participants, onChange }) {
       verified_by: verifiedBy.trim() || null,
     });
     setBusy(false);
-    if (error) { setFormError(error.message); return; }
+    if (error) { setFormError(writeErrorText(error)); return; }
     setParticipantId("");
     setValue("");
     setVerifiedBy("");
@@ -1503,7 +1558,7 @@ function ScoresManager({ challenges, entries, participants, onChange }) {
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
+                <tr className="text-left text-xs uppercase tracking-wide text-neutral-500">
                   <th className="px-2 py-1">Rang</th>
                   <th className="px-2 py-1">Nom</th>
                   <th className="px-2 py-1">Perf</th>
@@ -1526,7 +1581,7 @@ function ScoresManager({ challenges, entries, participants, onChange }) {
                 ))}
                 {ranked.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-2 py-3 text-neutral-400">
+                    <td colSpan={6} className="px-2 py-3 text-neutral-500">
                       Aucune performance pour ce défi.
                     </td>
                   </tr>
@@ -1584,7 +1639,7 @@ function ScoreRow({ r, metric, participants, siblings, onSave, onRemove }) {
       })
       .eq("id", r.id);
     setBusy(false);
-    if (error) { setErr(error.message); return; }
+    if (error) { setErr(writeErrorText(error)); return; }
     setEditing(false);
     onSave();
   };
@@ -1604,14 +1659,14 @@ function ScoreRow({ r, metric, participants, siblings, onSave, onRemove }) {
         <td className="px-2 py-1.5 font-semibold">
           {who}
           {r.participant?.gender && (
-            <span className="ml-1.5 text-xs font-bold text-neutral-400">
+            <span className="ml-1.5 text-xs font-bold text-neutral-500">
               {r.participant.gender}
             </span>
           )}
         </td>
         <td className="px-2 py-1.5 text-neutral-600">{r.raw_value}</td>
         <td className="text-bf-dark px-2 py-1.5 font-extrabold">{r.points}</td>
-        <td className="px-2 py-1.5 text-neutral-400 italic">{r.verified_by || "—"}</td>
+        <td className="px-2 py-1.5 text-neutral-500 italic">{r.verified_by || "—"}</td>
         <td className="px-2 py-1.5 text-right whitespace-nowrap">
           <button
             onClick={() => setEditing(true)}
@@ -1632,10 +1687,11 @@ function ScoreRow({ r, metric, participants, siblings, onSave, onRemove }) {
 
   return (
     <tr className="border-t border-bf-orange/30 bg-bf-light/40">
-      <td className="px-2 py-2 font-bold text-neutral-400">{r.rank}</td>
+      <td className="px-2 py-2 font-bold text-neutral-500">{r.rank}</td>
       <td className="px-2 py-2">
         <select
           value={participantId}
+          aria-label="Participant"
           onChange={(e) => setParticipantId(e.target.value)}
           className="max-w-[10rem] rounded border border-neutral-300 px-1.5 py-1 text-sm"
         >
@@ -1653,6 +1709,7 @@ function ScoreRow({ r, metric, participants, siblings, onSave, onRemove }) {
       </td>
       <td className="px-2 py-2">
         <input
+          aria-label="Performance"
           value={rawValue}
           onChange={(e) => setRawValue(e.target.value)}
           placeholder={metric === "time" ? "2:40" : "42"}
@@ -1660,11 +1717,12 @@ function ScoreRow({ r, metric, participants, siblings, onSave, onRemove }) {
         />
         {err && <p className="text-xs text-red-500 mt-0.5">{err}</p>}
       </td>
-      <td className="px-2 py-2 text-neutral-400">—</td>
+      <td className="px-2 py-2 text-neutral-500">—</td>
       <td className="px-2 py-2">
         <input
           value={verifiedBy}
           onChange={(e) => setVerifiedBy(e.target.value)}
+          aria-label="Vérifié par"
           placeholder="Prénom"
           className="w-24 rounded border border-neutral-300 px-2 py-1 text-sm"
         />

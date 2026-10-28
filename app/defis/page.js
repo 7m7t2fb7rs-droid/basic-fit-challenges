@@ -66,7 +66,13 @@ function SuggestionBanner() {
       .insert({ title: t, details: details.trim() || null });
     setBusy(false);
     if (error) {
-      setErr("L’envoi n’a pas abouti. Réessaie dans un instant.");
+      // Limite anti-spam posée en base (supabase-securite.sql).
+      const limited = String(error.message || "").includes("suggestions_rate_limited");
+      setErr(
+        limited
+          ? "Beaucoup d’idées sont arrivées d’un coup — réessaie un peu plus tard."
+          : "L’envoi n’a pas abouti. Réessaie dans un instant."
+      );
       return;
     }
     try {
@@ -220,8 +226,8 @@ export default function DefisPage() {
                 {METRIC_LABEL[c.metric]}
               </span>
               {c.end_date && (
-                <span className="ml-auto text-xs text-neutral-400">
-                  Fin : {new Date(c.end_date).toLocaleDateString("fr-FR")}
+                <span className="ml-auto text-xs text-neutral-500">
+                  Fin : {new Date(`${c.end_date}T12:00:00`).toLocaleDateString("fr-FR")}
                 </span>
               )}
             </div>
@@ -230,14 +236,14 @@ export default function DefisPage() {
             )}
 
             {ranked.length === 0 ? (
-              <p className="mt-3 text-sm text-neutral-400">
+              <p className="mt-3 text-sm text-neutral-500">
                 Pas encore de performance enregistrée.
               </p>
             ) : (
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full min-w-[300px] text-sm">
                   <thead>
-                    <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
+                    <tr className="text-left text-xs uppercase tracking-wide text-neutral-500">
                       <th className="px-2 py-1">Rang</th>
                       <th className="px-2 py-1">Nom</th>
                       <th className="px-2 py-1">
@@ -285,10 +291,10 @@ export default function DefisPage() {
                 {c.description && (
                   <p className="mt-1 text-sm text-neutral-500">{c.description}</p>
                 )}
-                <p className="mt-2 text-xs text-neutral-400">
+                <p className="mt-2 text-xs text-neutral-500">
                   {METRIC_LABEL[c.metric]}
                   {c.end_date &&
-                    ` · prévu le ${new Date(c.end_date).toLocaleDateString("fr-FR")}`}
+                    ` · prévu le ${new Date(`${c.end_date}T12:00:00`).toLocaleDateString("fr-FR")}`}
                 </p>
               </div>
             ))}

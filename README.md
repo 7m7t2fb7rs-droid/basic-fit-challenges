@@ -16,6 +16,8 @@ Next.js (App Router) + Supabase, déployable sur Vercel.
    Puis refais la même chose avec `supabase-settings.sql` (réglages : date de fin du compte à rebours)
    `supabase-participants.sql` (fiches des participants)
    et `supabase-suggestions.sql` (propositions de défis anonymes).
+   Enfin `supabase-securite.sql` (liste des admins, un score par personne et par défi,
+   anti-spam des propositions) — **après** avoir déployé le site.
    Ça crée les tables `challenges` et `entries` et les règles de sécurité.
 3. Menu **Project Settings → API** : copie **Project URL** et la clé **anon public**. On en a besoin à l'étape 3.
 
@@ -24,6 +26,13 @@ Next.js (App Router) + Supabase, déployable sur Vercel.
 Dans Supabase → **Authentication → Users → Add user** :
 - renseigne un email + mot de passe pour chaque admin,
 - coche **Auto Confirm User** (sinon le compte reste en attente d'email).
+
+Puis déclare-le admin dans **SQL Editor** :
+
+```sql
+insert into public.admins (user_id)
+select id from auth.users where email = 'prenom@exemple.fr';
+```
 
 Il n'y a pas d'inscription ouverte sur le site : seuls ces comptes peuvent se connecter à `/admin`.
 
@@ -54,7 +63,13 @@ Il n'y a pas d'inscription ouverte sur le site : seuls ces comptes peuvent se co
 ```bash
 npm install
 cp .env.example .env.local   # remplis avec tes clés Supabase
-npm run dev                  # http://localhost:3000
+NEXT_TELEMETRY_DISABLED=1 npm run dev   # http://localhost:3000
+```
+
+Sans `NEXT_TELEMETRY_DISABLED=1`, `next build` / `next dev` peuvent rester bloqués sans
+rien afficher sur certaines machines.
+
+```
 ```
 
 ## Comment marchent les points
@@ -79,4 +94,5 @@ supabase-schema.sql → tables + sécurité (à exécuter une fois)
 supabase-settings.sql → table des réglages, dont la date de fin du compte à rebours
 supabase-participants.sql → fiches participants (prénom, nom, genre) + lien avec les scores
 supabase-suggestions.sql  → propositions anonymes : écriture publique, lecture admin uniquement
+supabase-securite.sql     → admins, unicité des scores, colonnes publiques, anti-spam
 ```
