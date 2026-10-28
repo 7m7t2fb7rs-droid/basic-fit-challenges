@@ -18,6 +18,7 @@ Next.js (App Router) + Supabase, déployable sur Vercel.
    et `supabase-suggestions.sql` (propositions de défis anonymes).
    Enfin `supabase-securite.sql` (liste des admins, un score par personne et par défi,
    anti-spam des propositions) — **après** avoir déployé le site.
+   Puis `supabase-saisons.sql` (saisons : chaque défi appartient à une saison).
    Ça crée les tables `challenges` et `entries` et les règles de sécurité.
 3. Menu **Project Settings → API** : copie **Project URL** et la clé **anon public**. On en a besoin à l'étape 3.
 
@@ -76,7 +77,16 @@ rien afficher sur certaines machines.
 
 Barème F1 par défi : **25, 18, 15, 12, 10, 8, 6, 4, 2, 1** (puis 0 au-delà de la 10e).
 Dans chaque défi, **le meilleur score = 1re place** (temps le plus long *ou* le plus de répétitions).
-Le classement général additionne les points de chaque participant sur tous les défis.
+Le classement général additionne les points de chaque participant sur les défis de la
+saison ouverte. À côté de chaque nom, une flèche indique les places gagnées ou perdues
+depuis le dernier défi.
+
+## Saisons
+
+Dans l’espace équipe, onglet **Saisons** : la date de fin de la saison sert de compte à
+rebours sur l’accueil. À la fin, **Clôturer la saison** fige son classement final (visible sur
+`/saisons`), puis on ouvre la suivante : les points repartent de zéro et les défis « À venir »
+y sont rattachés.
 La logique est dans `lib/scoring.js`.
 
 ## Structure
@@ -95,4 +105,5 @@ supabase-settings.sql → table des réglages, dont la date de fin du compte à 
 supabase-participants.sql → fiches participants (prénom, nom, genre) + lien avec les scores
 supabase-suggestions.sql  → propositions anonymes : écriture publique, lecture admin uniquement
 supabase-securite.sql     → admins, unicité des scores, colonnes publiques, anti-spam
+supabase-saisons.sql      → saisons et rattachement des défis
 ```

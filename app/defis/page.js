@@ -11,6 +11,7 @@ import {
   indexParticipants,
   attachParticipants,
 } from "@/lib/scoring";
+import { shownSeason, challengesOf } from "@/lib/seasons";
 
 /* "2026-10-16" → « 16 octobre ». Midi évite qu'un fuseau décalé recule
    la date d'un jour. */
@@ -207,11 +208,15 @@ export default function DefisPage() {
       return (a.sort_order ?? 0) - (b.sort_order ?? 0);
     };
 
-    const all = data.challenges;
+    // Les défis joués de la saison affichée ; ceux à venir quelle que soit
+    // leur saison (ils rejoignent la prochaine à son ouverture).
+    const season = shownSeason(data.seasons);
+    const mine = challengesOf(data.challenges, season, data.seasons);
     return {
-      active: all.filter((c) => c.status === "active").sort(recentFirst).map(withResults),
-      finished: all.filter((c) => c.status === "finished").sort(recentFirst).map(withResults),
-      upcoming: all.filter((c) => c.status === "upcoming").sort(soonestFirst),
+      season,
+      active: mine.filter((c) => c.status === "active").sort(recentFirst).map(withResults),
+      finished: mine.filter((c) => c.status === "finished").sort(recentFirst).map(withResults),
+      upcoming: data.challenges.filter((c) => c.status === "upcoming").sort(soonestFirst),
     };
   }, [data]);
 
@@ -219,7 +224,10 @@ export default function DefisPage() {
     <>
       <div className="page-head">
         <h1>Défis</h1>
-        <p>Les résultats de chaque défi, et ceux qui arrivent.</p>
+        <p>
+          {groups?.season ? `${groups.season.name} · ` : ""}Les résultats de chaque défi, et
+          ceux qui arrivent.
+        </p>
       </div>
 
       {loading ? (

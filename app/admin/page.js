@@ -13,12 +13,8 @@ import {
   matchParticipants,
   nameKey,
 } from "@/lib/scoring";
-import {
-  fetchCountdownEnd,
-  saveCountdownEnd,
-  saveSetting,
-  DEFAULT_COUNTDOWN_END,
-} from "@/lib/settings";
+import { saveSetting } from "@/lib/settings";
+import { openSeason, closedSeasons, challengesOf, snapshotBoards } from "@/lib/seasons";
 import {
   DAYS,
   DEFAULT_HOURS,
@@ -28,6 +24,7 @@ import {
   statusLabel,
 } from "@/lib/gym";
 import { invalidateData, useData } from "@/lib/store";
+import Stopwatch from "./Stopwatch";
 
 /* ------------------------------------------------------------------ */
 /*  Page admin : connexion + gestion des défis et des scores          */
@@ -144,7 +141,7 @@ const TABS = [
   { key: "participants", label: "Participants" },
   { key: "suggestions", label: "Suggestions" },
   { key: "gym", label: "Salle" },
-  { key: "countdown", label: "Compte à rebours" },
+  { key: "seasons", label: "Saisons" },
 ];
 
 function Dashboard({ email }) {
@@ -153,24 +150,27 @@ function Dashboard({ email }) {
   const [entries, setEntries] = useState([]);
   const [participants, setParticipants] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
+  const [seasons, setSeasons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
 
   // Rechargement silencieux : on ne repasse pas par l'écran « Chargement… »,
   // sinon les formulaires en cours de saisie seraient démontés et vidés.
   const reload = useCallback(async () => {
-    const [chRes, enRes, paRes, suRes] = await Promise.all([
+    const [chRes, enRes, paRes, suRes, seRes] = await Promise.all([
       supabase.from("challenges").select("*").order("sort_order", { ascending: true }),
       supabase.from("entries").select("*"),
       supabase.from("participants").select("*"),
       supabase.from("suggestions").select("*").order("created_at", { ascending: false }),
+      supabase.from("seasons").select("*").order("created_at", { ascending: true }),
     ]);
-    const failed = chRes.error || enRes.error || paRes.error || suRes.error;
+    const failed = chRes.error || enRes.error || paRes.error || suRes.error || seRes.error;
     setLoadError(failed ? failed.message : null);
     setChallenges(chRes.data || []);
     setEntries(enRes.data || []);
     setParticipants(paRes.data || []);
     setSuggestions(suRes.data || []);
+    setSeasons(seRes.data || []);
     setLoading(false);
     // Le classement public garde ses données en mémoire : après une saisie,
     // il doit les relire plutôt que de resservir l'état d'avant.
@@ -180,6 +180,10 @@ function Dashboard({ email }) {
   useEffect(() => {
     reload();
   }, [reload]);
+
+  // Les scores et la liste des défis ne portent que sur la saison ouverte.
+  const season = openSeason(seasons);
+  const seasonChallenges = challengesOf(challenges, season, seasons);
 
   // Pastille sur l'onglet : le nombre de propositions non encore traitées.
   const pending = suggestions.filter((x) => x.status === "new").length;
@@ -223,14 +227,19 @@ function Dashboard({ email }) {
         <>
           {tab === "scores" && (
             <ScoresManager
-              challenges={challenges}
+              season={season}
+              challenges={seasonChallenges}
               entries={entries}
               participants={participants}
               onChange={reload}
             />
           )}
           {tab === "challenges" && (
-            <ChallengesManager challenges={challenges} onChange={reload} />
+            <ChallengesManager
+              season={season}
+              challenges={seasonChallenges}
+              onChange={reload}
+            />
           )}
           {tab === "participants" && (
             <ParticipantsManager
@@ -243,7 +252,15 @@ function Dashboard({ email }) {
             <SuggestionsManager suggestions={suggestions} onChange={reload} />
           )}
           {tab === "gym" && <GymManager />}
-          {tab === "countdown" && <CountdownManager />}
+          {tab === "seasons" && (
+            <SeasonsManager
+              seasons={seasons}
+              challenges={challenges}
+              entries={entries}
+              participants={participants}
+              onChange={reload}
+            />
+          )}
         </>
       )}
     </div>
@@ -573,114 +590,303 @@ function SuggestionsManager({ suggestions, onChange }) {
   );
 }
 
-/* ------------- Date de fin du compte à rebours (accueil) ---------- */
-function CountdownManager() {
-  const [date, setDate] = useState("");
-  const [saved, setSaved] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState(null);
+/* ------------------------------ Saisons ---------------------------- */
+/*  Une saison ouverte à la fois. La clôturer fige son classement final */
+/*  (consultable sur /saisons) ; les points repartent de zéro à          */
+/*  l'ouverture de la suivante, qui récupère les défis « À venir ».      */
+const inputCls = "rounded-lg border border-neutral-300 px-3 py-2 text-sm";
+const primaryCls =
+  "rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60";
+const ghostCls =
+  "rounded-lg border border-neutral-300 px-4 py-2 text-sm font-semibold hover:bg-neutral-100 disabled:opacity-60";
 
-  useEffect(() => {
-    (async () => {
-      const v = await fetchCountdownEnd();
-      setDate(v);
-      setSaved(v);
-      setLoading(false);
-    })();
-  }, []);
-
-  const save = async (e) => {
-    e.preventDefault();
-    if (!date) return;
-    setBusy(true);
-    setMsg(null);
-    const { error } = await saveCountdownEnd(date);
-    setBusy(false);
-    if (error) {
-      setMsg({ type: "error", text: error.message });
-      return;
-    }
-    setSaved(date);
-    setMsg({ type: "ok", text: "Date enregistrée ✓" });
-  };
-
-  const formatted = saved
-    ? new Date(`${saved}T12:00:00`).toLocaleDateString("fr-FR", {
-        weekday: "long",
+const frDate = (iso) =>
+  iso
+    ? new Date(`${iso}T12:00:00`).toLocaleDateString("fr-FR", {
         day: "numeric",
         month: "long",
         year: "numeric",
-      })
-    : "";
+      }).replace(/^1 /, "1er ")
+    : "—";
+
+function SeasonsManager({ seasons, challenges, entries, participants, onChange }) {
+  const current = openSeason(seasons);
+  const past = closedSeasons(seasons);
 
   return (
     <section className="rounded-2xl bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-bold">Compte à rebours</h2>
+      <h2 className="text-lg font-bold">Saisons</h2>
       <p className="mb-4 text-sm text-neutral-500">
-        Date de fin affichée sur la page d&apos;accueil. Le décompte s&apos;arrête à
-        23h59 ce jour-là.
+        Le classement général ne compte que les défis de la saison ouverte. À la fin, clôture-la :
+        son classement final est figé et reste consultable, puis ouvre la suivante — les points
+        repartent de zéro.
       </p>
 
-      {loading ? (
-        <p className="text-sm text-neutral-500">Chargement…</p>
+      {current ? (
+        <CurrentSeason
+          key={current.id}
+          season={current}
+          seasons={seasons}
+          challenges={challenges}
+          entries={entries}
+          participants={participants}
+          onChange={onChange}
+        />
       ) : (
-        <>
-          <form onSubmit={save} className="flex flex-wrap items-end gap-2">
-            <label className="text-sm">
-              <span className="mb-1 block text-neutral-500">Date de fin</span>
-              <input
-                type="date"
-                required
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-              />
-            </label>
-            <button
-              disabled={busy || date === saved}
-              className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-            >
-              {busy ? "…" : "Enregistrer"}
-            </button>
-            {date !== saved && (
-              <button
-                type="button"
-                onClick={() => setDate(saved)}
-                className="rounded-lg border border-neutral-300 px-3 py-2 text-sm font-semibold hover:bg-neutral-100"
-              >
-                Annuler
-              </button>
-            )}
-          </form>
+        <NewSeasonForm seasons={seasons} onChange={onChange} />
+      )}
 
-          <p className="mt-3 text-sm text-neutral-500">
-            Actuellement : <span className="font-semibold text-bf-dark">{formatted}</span>
-          </p>
-          {msg && (
-            <p
-              className={`mt-2 text-sm ${
-                msg.type === "ok" ? "text-green-600" : "text-red-600"
-              }`}
-            >
-              {msg.text}
-              {msg.type === "error" && (
-                <span className="block text-xs text-neutral-500">
-                  Si la table « settings » n&apos;existe pas encore, exécute
-                  supabase-settings.sql dans Supabase. (Valeur par défaut :{" "}
-                  {DEFAULT_COUNTDOWN_END})
+      {past.length > 0 && (
+        <>
+          <h3 className="gym-hours-title">Saisons clôturées</h3>
+          <ul className="space-y-2">
+            {past.map((s) => (
+              <li
+                key={s.id}
+                className="flex flex-wrap items-center gap-2 rounded-xl border border-neutral-200 px-3 py-2 text-sm"
+              >
+                <span className="font-semibold">{s.name}</span>
+                <span className="text-neutral-500">
+                  {frDate(s.start_date)} – {frDate(s.end_date)}
+                  {s.final_board?.all?.[0] && ` · 1er : ${s.final_board.all[0].name}`}
                 </span>
-              )}
-            </p>
-          )}
+                {!current && s.id === past[0].id && (
+                  <ReopenButton season={s} onChange={onChange} />
+                )}
+              </li>
+            ))}
+          </ul>
         </>
       )}
     </section>
   );
 }
 
+function CurrentSeason({ season, seasons, challenges, entries, participants, onChange }) {
+  const [form, setForm] = useState({
+    name: season.name,
+    start_date: season.start_date || "",
+    end_date: season.end_date || "",
+  });
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const mine = challengesOf(challenges, season, seasons);
+  const played = mine.filter((c) => c.status !== "upcoming");
+  const active = mine.filter((c) => c.status === "active");
+
+  const save = async (e) => {
+    e.preventDefault();
+    if (form.start_date && form.end_date && form.end_date < form.start_date) {
+      setMsg({ type: "error", text: "La fin doit être après le début." });
+      return;
+    }
+    setBusy(true);
+    setMsg(null);
+    const { error } = await supabase
+      .from("seasons")
+      .update({
+        name: form.name.trim(),
+        start_date: form.start_date || null,
+        end_date: form.end_date || null,
+      })
+      .eq("id", season.id);
+    setBusy(false);
+    if (error) return setMsg({ type: "error", text: writeErrorText(error) });
+    setMsg({ type: "ok", text: "Saison enregistrée." });
+    onChange();
+  };
+
+  const close = async () => {
+    const warn =
+      `Clôturer « ${season.name} » ?\n\n` +
+      `Le classement final (${played.length} défi${played.length > 1 ? "s" : ""}) sera figé, ` +
+      (active.length ? `les défis encore en cours passeront en « Terminé », ` : "") +
+      `et les points repartiront de zéro à l’ouverture de la saison suivante.`;
+    if (!confirm(warn)) return;
+    setBusy(true);
+    setMsg(null);
+    const { error } = await supabase
+      .from("seasons")
+      .update({
+        status: "closed",
+        closed_at: new Date().toISOString(),
+        final_board: snapshotBoards(mine, entries, participants),
+      })
+      .eq("id", season.id);
+    if (!error && active.length) {
+      await supabase
+        .from("challenges")
+        .update({ status: "finished" })
+        .in("id", active.map((c) => c.id));
+    }
+    setBusy(false);
+    if (error) return setMsg({ type: "error", text: writeErrorText(error) });
+    onChange();
+  };
+
+  return (
+    <div className="rounded-xl border border-neutral-200 p-4">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">
+          Ouverte
+        </span>
+        <span className="text-sm text-neutral-500">
+          {played.length} défi{played.length > 1 ? "s" : ""} joué{played.length > 1 ? "s" : ""}
+          {active.length > 0 && `, dont ${active.length} en cours`}
+        </span>
+      </div>
+      <form onSubmit={save} className="flex flex-wrap items-end gap-2">
+        <label className="text-sm">
+          <span className="mb-1 block text-neutral-500">Nom</span>
+          <input
+            required
+            maxLength={60}
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className={inputCls}
+          />
+        </label>
+        <label className="text-sm">
+          <span className="mb-1 block text-neutral-500">Début</span>
+          <input
+            type="date"
+            value={form.start_date}
+            onChange={(e) => setForm({ ...form, start_date: e.target.value })}
+            className={inputCls}
+          />
+        </label>
+        <label className="text-sm">
+          <span className="mb-1 block text-neutral-500">Fin (compte à rebours)</span>
+          <input
+            type="date"
+            required
+            value={form.end_date}
+            onChange={(e) => setForm({ ...form, end_date: e.target.value })}
+            className={inputCls}
+          />
+        </label>
+        <button disabled={busy} className={primaryCls}>
+          Enregistrer
+        </button>
+      </form>
+      <div className="mt-4 border-t border-neutral-200 pt-4">
+        <button type="button" disabled={busy} onClick={close} className={ghostCls}>
+          Clôturer la saison…
+        </button>
+      </div>
+      {msg && (
+        <p className={`mt-3 text-sm ${msg.type === "ok" ? "text-green-700" : "text-red-600"}`}>
+          {msg.text}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function NewSeasonForm({ seasons, onChange }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [form, setForm] = useState({
+    name: `Saison ${seasons.length + 1}`,
+    start_date: today,
+    end_date: "",
+  });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const create = async (e) => {
+    e.preventDefault();
+    if (form.end_date < form.start_date) return setErr("La fin doit être après le début.");
+    setBusy(true);
+    setErr(null);
+    const { data, error } = await supabase
+      .from("seasons")
+      .insert({
+        name: form.name.trim(),
+        start_date: form.start_date,
+        end_date: form.end_date,
+        status: "open",
+      })
+      .select()
+      .single();
+    if (!error) {
+      // Les défis annoncés « À venir » rejoignent la nouvelle saison.
+      await supabase.from("challenges").update({ season_id: data.id }).eq("status", "upcoming");
+    }
+    setBusy(false);
+    if (error) return setErr(writeErrorText(error));
+    onChange();
+  };
+
+  return (
+    <form
+      onSubmit={create}
+      className="grid gap-2 rounded-xl border border-dashed border-neutral-300 p-4 sm:grid-cols-4"
+    >
+      <div className="text-sm font-semibold text-neutral-700 sm:col-span-4">
+        Aucune saison ouverte — ouvre la suivante
+      </div>
+      <label className="text-sm">
+        <span className="mb-1 block text-neutral-500">Nom</span>
+        <input
+          required
+          maxLength={60}
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          className={`w-full ${inputCls}`}
+        />
+      </label>
+      <label className="text-sm">
+        <span className="mb-1 block text-neutral-500">Début</span>
+        <input
+          type="date"
+          required
+          value={form.start_date}
+          onChange={(e) => setForm({ ...form, start_date: e.target.value })}
+          className={`w-full ${inputCls}`}
+        />
+      </label>
+      <label className="text-sm">
+        <span className="mb-1 block text-neutral-500">Fin</span>
+        <input
+          type="date"
+          required
+          value={form.end_date}
+          onChange={(e) => setForm({ ...form, end_date: e.target.value })}
+          className={`w-full ${inputCls}`}
+        />
+      </label>
+      <div className="flex items-end">
+        <button disabled={busy} className={`w-full ${primaryCls}`}>
+          {busy ? "…" : "Ouvrir la saison"}
+        </button>
+      </div>
+      {err && <p className="text-sm text-red-600 sm:col-span-4">{err}</p>}
+    </form>
+  );
+}
+
+/* Rattrapage d'une clôture faite trop tôt : seulement pour la dernière
+   saison, et tant qu'aucune autre n'a été ouverte. */
+function ReopenButton({ season, onChange }) {
+  const reopen = async () => {
+    if (!confirm(`Rouvrir « ${season.name} » ? Son classement final figé sera effacé.`)) return;
+    const { error } = await supabase
+      .from("seasons")
+      .update({ status: "open", closed_at: null, final_board: null })
+      .eq("id", season.id);
+    if (error) return alert(writeErrorText(error));
+    onChange();
+  };
+  return (
+    <button type="button" onClick={reopen} className="ml-auto text-xs font-semibold text-neutral-500 hover:underline">
+      Rouvrir
+    </button>
+  );
+}
+
 /* ----------------------- Gestion des défis ------------------------ */
-function ChallengesManager({ challenges, onChange }) {
+function ChallengesManager({ season, challenges, onChange }) {
   const blank = {
     name: "",
     description: "",
@@ -694,9 +900,11 @@ function ChallengesManager({ challenges, onChange }) {
 
   const create = async (e) => {
     e.preventDefault();
+    if (!season) return alert("Ouvre d’abord une saison, dans l’onglet Saisons.");
     setBusy(true);
     const payload = {
       ...form,
+      season_id: season.id,
       name: form.name.trim(),
       description: form.description.trim() || null,
       end_date: form.end_date || null,
@@ -713,6 +921,9 @@ function ChallengesManager({ challenges, onChange }) {
       <h2 className="text-lg font-bold">Défis</h2>
       <p className="mb-4 text-sm text-neutral-500">
         Crée un défi, choisis s&apos;il se mesure en temps ou en répétitions, gère son statut.
+        {season
+          ? ` Les défis listés ici sont ceux de la ${season.name}.`
+          : " Aucune saison n’est ouverte : ouvre-en une dans l’onglet Saisons pour ajouter des défis."}
       </p>
 
       <div className="space-y-2">
@@ -1421,7 +1632,7 @@ function ParticipantPicker({
 }
 
 /* ---------------------- Gestion des scores ------------------------ */
-function ScoresManager({ challenges, entries, participants, onChange }) {
+function ScoresManager({ season, challenges, entries, participants, onChange }) {
   const sorted = [...challenges].sort((a, b) => {
     if (a.status === "active" && b.status !== "active") return -1;
     if (b.status === "active" && a.status !== "active") return 1;
@@ -1433,6 +1644,7 @@ function ScoresManager({ challenges, entries, participants, onChange }) {
   const [verifiedBy, setVerifiedBy] = useState("");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState(null);
+  const [chrono, setChrono] = useState(false);
 
   const selected = sorted.find((c) => c.id === selectedId);
   const chEntries = entries.filter((e) => e.challenge_id === selectedId);
@@ -1486,6 +1698,7 @@ function ScoresManager({ challenges, entries, participants, onChange }) {
       <h2 className="text-lg font-bold">Scores des participants</h2>
       <p className="mb-4 text-sm text-neutral-500">
         Choisis un défi, puis la personne. Le rang et les points se calculent seuls.
+        {!season && " Aucune saison n’est ouverte : il n’y a pas de défi où saisir un score."}
       </p>
 
       <label className="text-sm">
@@ -1533,6 +1746,16 @@ function ScoresManager({ challenges, entries, participants, onChange }) {
                   className="w-32 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                 />
               </label>
+              {selected.metric === "time" && (
+                <button
+                  type="button"
+                  onClick={() => setChrono((v) => !v)}
+                  aria-expanded={chrono}
+                  className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-semibold hover:bg-neutral-100"
+                >
+                  {chrono ? "Masquer le chrono" : "Chronométrer"}
+                </button>
+              )}
               <label className="text-sm">
                 <span className="mb-1 block text-neutral-500">Vérifié par</span>
                 <input
@@ -1549,6 +1772,7 @@ function ScoresManager({ challenges, entries, participants, onChange }) {
                 {busy ? "…" : "Ajouter"}
               </button>
             </div>
+            {chrono && selected.metric === "time" && <Stopwatch onTime={setValue} />}
           </form>
           {formError && (
             <p className="mt-2 text-sm text-red-600">{formError}</p>

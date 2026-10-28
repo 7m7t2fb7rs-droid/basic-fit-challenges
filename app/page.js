@@ -13,7 +13,10 @@ import {
   indexParticipants,
   attachParticipants,
   filterEntriesByGender,
+  rankMoves,
 } from "@/lib/scoring";
+import { openSeason, closedSeasons, challengesOf } from "@/lib/seasons";
+import FinalBoard from "./FinalBoard";
 import { endOfDay } from "@/lib/settings";
 
 const ordinal = (n) => (n === 1 ? "1er" : `${n}e`);
@@ -138,6 +141,23 @@ function ParticipantSheet({ person, rows, onClose }) {
   );
 }
 
+/* Flèche d'évolution, à côté du nom : ▲ 2 = gagne deux places depuis le
+   dernier défi. Rien quand la place ne change pas. */
+function Move({ move }) {
+  if (!move || move.delta === 0) return null;
+  if (move.isNew) return <span className="move move-new">nouveau</span>;
+  const up = move.delta > 0;
+  const n = Math.abs(move.delta);
+  return (
+    <span className={up ? "move move-up" : "move move-down"}>
+      <span aria-hidden="true">{up ? "▲" : "▼"} {n}</span>
+      <span className="sr-only">
+        {up ? "gagne" : "perd"} {n} place{n > 1 ? "s" : ""}
+      </span>
+    </span>
+  );
+}
+
 function GenderFilter({ value, onChange }) {
   return (
     <div className="segmented" role="group" aria-label="Catégorie du classement">
@@ -155,7 +175,13 @@ export default function HomePage() {
   const { data, loading, error, refresh } = useData();
   const [filter, setFilter] = useState("all");
   const [selectedId, setSelectedId] = useState(null);
-  const season = useSeasonText(data?.countdownEnd);
+  // Seuls les défis de la saison ouverte comptent. Entre deux saisons
+  // (la dernière clôturée, la suivante pas encore ouverte), on montre le
+  // classement final figé de celle qui vient de finir.
+  const current = openSeason(data?.seasons);
+  const lastClosed = closedSeasons(data?.seasons)[0] || null;
+  const betweenSeasons = !!data && data.seasons.length > 0 && !current;
+  const seasonText = useSeasonText(current ? current.end_date : data?.countdownEnd);
 
   const { counting, activeChallenges, byCh } = useMemo(() => {
     if (!data) return { counting: [], activeChallenges: [], byCh: {} };
@@ -163,9 +189,10 @@ export default function HomePage() {
     attachParticipants(data.entries, indexParticipants(data.participants)).forEach((e) => {
       (map[e.challenge_id] = map[e.challenge_id] || []).push(e);
     });
+    const mine = challengesOf(data.challenges, openSeason(data.seasons), data.seasons);
     return {
-      counting: data.challenges.filter((c) => c.status !== "upcoming"),
-      activeChallenges: data.challenges.filter((c) => c.status === "active"),
+      counting: mine.filter((c) => c.status !== "upcoming"),
+      activeChallenges: mine.filter((c) => c.status === "active"),
       byCh: map,
     };
   }, [data]);
@@ -174,6 +201,14 @@ export default function HomePage() {
   // barème est recalculé au sein du groupe (1er du groupe = 25 pts).
   const filtered = useMemo(() => filterEntriesByGender(byCh, filter), [byCh, filter]);
   const board = useMemo(() => buildLeaderboard(counting, filtered), [counting, filtered]);
+  // Flèches : évolution de chacun depuis le dernier défi, dans la même
+  // catégorie que le classement affiché.
+  const moves = useMemo(() => rankMoves(counting, filtered), [counting, filtered]);
+  // Participants qui ont au moins un score cette saison.
+  const participants = useMemo(
+    () => buildLeaderboard(counting, byCh).length,
+    [counting, byCh]
+  );
   const selected = board.find((p) => p.id === selectedId) || null;
 
   // Détail d'un participant, calculé sur les MÊMES scores que le classement
@@ -205,19 +240,21 @@ export default function HomePage() {
     if (selectedId && !board.some((p) => p.id === selectedId)) setSelectedId(null);
   }, [board, selectedId]);
 
-  const participants = data?.participants.length ?? 0;
-
   return (
     <>
       <div className="page-head home-head">
         <div>
           <h1>Classement</h1>
-          {data && (
-            <p>
-              {participants} participants, {counting.length} défi{counting.length > 1 ? "s" : ""}.{" "}
-              {season}
-            </p>
-          )}
+          {data &&
+            (betweenSeasons ? (
+              <p>La {lastClosed?.name || "saison"} est terminée. La suivante arrive bientôt.</p>
+            ) : (
+              <p>
+                {current && `${current.name} · `}
+                {participants} participant{participants > 1 ? "s" : ""}, {counting.length} défi
+                {counting.length > 1 ? "s" : ""}. {seasonText}
+              </p>
+            ))}
         </div>
         <GenderFilter value={filter} onChange={setFilter} />
       </div>
@@ -236,6 +273,8 @@ export default function HomePage() {
                 Réessayer
               </button>
             </div>
+          ) : betweenSeasons ? (
+            <FinalBoard season={lastClosed} filter={filter} titleId="board-title" />
           ) : board.length === 0 ? (
             <div className="card empty">
               <strong>
@@ -251,7 +290,10 @@ export default function HomePage() {
                   est juste au-dessus et pourrait être pris pour celui-ci. */}
               <div className="board-head">
                 <h2 id="board-title">Classement général</h2>
-                <p>Points cumulés sur tous les défis</p>
+                <p>
+                  Points cumulés sur les défis de la saison
+                  {moves && ` · flèches : depuis le défi ${moves.since.name.trim()}`}
+                </p>
               </div>
               <table>
                 <caption className="sr-only">
@@ -275,6 +317,7 @@ export default function HomePage() {
                       <td>
                         <button type="button" className="row-btn" onClick={() => setSelectedId(p.id)}>
                           {p.name}
+                          {moves && <Move move={moves.moves[p.id]} />}
                         </button>
                       </td>
                       <td className="pts">
@@ -317,10 +360,27 @@ export default function HomePage() {
             );
           })}
 
+          {closedSeasons(data?.seasons).length > 0 && (
+            <div className="card rules">
+              <strong>Saisons précédentes</strong>
+              <ul className="past">
+                {closedSeasons(data.seasons).map((s) => (
+                  <li key={s.id}>
+                    {s.name}
+                    <span>{s.final_board?.all?.[0]?.name || "—"}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link className="link" href="/saisons">
+                Voir les classements finaux
+              </Link>
+            </div>
+          )}
+
           <div className="card rules">
             <strong>Comment marchent les points</strong>
             Les 10 premiers de chaque défi marquent {F1_POINTS.slice(0, -1).join(", ")} et{" "}
-            {F1_POINTS.at(-1)} point. Les points s’additionnent d’un défi à l’autre.
+            {F1_POINTS.at(-1)} point. Les points s’additionnent d’un défi à l’autre et repartent de zéro à chaque saison.
           </div>
         </aside>
       </div>
