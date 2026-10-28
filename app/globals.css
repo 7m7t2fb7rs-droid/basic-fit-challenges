@@ -88,6 +88,9 @@ input, select, textarea { font-size: max(16px, 1em); accent-color: var(--accent)
 .side { display: flex; flex-direction: column; gap: 16px; }
 
 .board { overflow: hidden; }
+.board-head { padding: 16px 18px 14px; border-bottom: 1px solid var(--line); }
+.board-head h2 { font-size: 17px; font-weight: 700; letter-spacing: -.2px; }
+.board-head p { font-size: 13px; color: var(--muted); margin-top: 1px; }
 .board table { width: 100%; border-collapse: collapse; }
 .board th { text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); padding: 12px 18px; border-bottom: 1px solid var(--line); }
 .board th:nth-child(2) { padding-left: 0; }

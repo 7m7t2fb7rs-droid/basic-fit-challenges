@@ -223,7 +223,7 @@ export default function HomePage() {
       </div>
 
       <div className="home-layout">
-        <section aria-label="Classement général">
+        <section aria-labelledby="board-title">
           {loading ? (
             <div className="card empty" role="status">
               Chargement du classement…
@@ -247,6 +247,12 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="card board">
+              {/* Titre explicite : sur mobile, le classement du défi en cours
+                  est juste au-dessus et pourrait être pris pour celui-ci. */}
+              <div className="board-head">
+                <h2 id="board-title">Classement général</h2>
+                <p>Points cumulés sur tous les défis</p>
+              </div>
               <table>
                 <caption className="sr-only">
                   Classement général — {filter === "all" ? "Tous" : GENDER_LABEL[filter]}. Touche
@@ -288,7 +294,7 @@ export default function HomePage() {
             const ranked = rankChallenge(byCh[ch.id] || [], ch.metric);
             return (
               <article key={ch.id} className="card live">
-                <span className="live-tag">En cours</span>
+                <span className="live-tag">Défi en cours</span>
                 <h3>{ch.name}</h3>
                 {ch.description && <p>{ch.description}</p>}
                 {ranked.length > 0 ? (
