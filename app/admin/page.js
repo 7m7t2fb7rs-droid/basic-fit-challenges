@@ -91,8 +91,7 @@ function LoginForm() {
 
   return (
     <div className="login-panel">
-      <p className="eyebrow">DANS LES COULISSES DU CLUB</p>
-      <h1 className="text-2xl font-extrabold tracking-tight">Espace admin</h1>
+      <h1>Espace équipe</h1>
       <p className="mb-4 text-sm text-neutral-500">
         Connecte-toi pour gérer les défis et saisir les scores.
       </p>
@@ -126,7 +125,7 @@ function LoginForm() {
         )}
         <button
           disabled={busy}
-          className="w-full rounded-lg bg-bf-orange px-4 py-2 font-semibold text-white disabled:opacity-60"
+          className="w-full rounded-lg bg-neutral-900 px-4 py-2 font-semibold text-white disabled:opacity-60"
         >
           {busy ? "Connexion…" : "Se connecter"}
         </button>
@@ -189,7 +188,7 @@ function Dashboard({ email }) {
     <div className="admin-dashboard">
       <div className="admin-head">
         <div>
-          <h1>Espace admin</h1>
+          <h1>Espace équipe</h1>
           <p className="admin-who">Connecté : {email}</p>
         </div>
         <button onClick={() => supabase.auth.signOut()} className="admin-signout">
@@ -370,7 +369,7 @@ function GymManager() {
           <button
             type="button"
             disabled={busy}
-            className="rounded-lg bg-bf-orange px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
             onClick={() => write(OVERRIDE_KEY, "", "Retour aux horaires habituels.")}
           >
             Revenir aux horaires habituels
@@ -393,7 +392,7 @@ function GymManager() {
             type="button"
             disabled={busy}
             onClick={close}
-            className="rounded-lg bg-bf-orange px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
           >
             Marquer la salle fermée
           </button>
@@ -458,7 +457,7 @@ function GymManager() {
         type="button"
         onClick={saveHours}
         disabled={busy}
-        className="mt-4 rounded-lg bg-bf-orange px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+        className="mt-4 rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
       >
         {busy ? "…" : "Enregistrer les horaires"}
       </button>
@@ -640,7 +639,7 @@ function CountdownManager() {
             </label>
             <button
               disabled={busy || date === saved}
-              className="rounded-lg bg-bf-orange px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
             >
               {busy ? "…" : "Enregistrer"}
             </button>
@@ -791,7 +790,7 @@ function ChallengesManager({ challenges, onChange }) {
         <div className="sm:col-span-2">
           <button
             disabled={busy}
-            className="rounded-lg bg-bf-orange px-4 py-2 font-semibold text-white disabled:opacity-60"
+            className="rounded-lg bg-neutral-900 px-4 py-2 font-semibold text-white disabled:opacity-60"
           >
             {busy ? "Ajout…" : "Ajouter le défi"}
           </button>
@@ -919,7 +918,7 @@ function ChallengeRow({ challenge, onChange }) {
         <button
           onClick={save}
           disabled={busy}
-          className="rounded-lg bg-bf-orange px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
+          className="rounded-lg bg-neutral-900 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
         >
           {busy ? "…" : "Enregistrer"}
         </button>
@@ -1029,7 +1028,7 @@ function ParticipantsManager({ participants, entries, onChange }) {
         </select>
         <button
           disabled={busy || !form.first_name.trim()}
-          className="rounded-lg bg-bf-orange px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
         >
           {busy ? "…" : "Créer la fiche"}
         </button>
@@ -1169,7 +1168,7 @@ function ParticipantRow({ participant, scores, onChange }) {
         <button
           onClick={save}
           disabled={busy || !p.first_name.trim()}
-          className="rounded-lg bg-bf-orange px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
+          className="rounded-lg bg-neutral-900 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
         >
           {busy ? "…" : "Enregistrer"}
         </button>
@@ -1344,7 +1343,7 @@ function ParticipantPicker({
             type="button"
             onClick={create}
             disabled={busy || !creating.first_name.trim()}
-            className="rounded-lg bg-bf-orange px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
+            className="rounded-lg bg-neutral-900 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
           >
             {busy ? "…" : "Créer et sélectionner"}
           </button>
@@ -1545,7 +1544,7 @@ function ScoresManager({ challenges, entries, participants, onChange }) {
               </label>
               <button
                 disabled={busy}
-                className="rounded-lg bg-bf-orange px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
               >
                 {busy ? "…" : "Ajouter"}
               </button>
@@ -1731,7 +1730,7 @@ function ScoreRow({ r, metric, participants, siblings, onSave, onRemove }) {
         <button
           onClick={save}
           disabled={busy || !!clash}
-          className="text-xs font-semibold text-white bg-bf-orange rounded px-2 py-1 mr-1 disabled:opacity-60"
+          className="text-xs font-semibold text-white bg-neutral-900 rounded px-2 py-1 mr-1 disabled:opacity-60"
         >
           {busy ? "…" : "OK"}
         </button>

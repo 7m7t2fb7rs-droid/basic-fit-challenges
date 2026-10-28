@@ -1,17 +1,14 @@
 export const metadata = {
-  title: "Mentions légales & confidentialité — Challenges Basic Fit",
+  title: "Mentions légales — Challenges Basic Fit",
 };
 
 /* Page statique : obligations de la LCEN (éditeur, hébergeur) et
    information des participants sur leurs données (RGPD). */
 export default function MentionsLegalesPage() {
   return (
-    <div className="legal-page">
-      <div className="page-hero">
-        <p className="eyebrow">INFORMATIONS</p>
-        <h1>
-          MENTIONS LÉGALES<span className="orange-period">.</span>
-        </h1>
+    <div className="legal">
+      <div className="page-head">
+        <h1>Mentions légales et confidentialité</h1>
         <p>Qui publie ce site, et ce qu’il fait des informations des participants.</p>
       </div>
 
@@ -50,7 +47,7 @@ export default function MentionsLegalesPage() {
         </p>
         <p>
           Chacun peut à tout moment demander à consulter, corriger ou faire retirer ses
-          informations du site : il suffit de le demander à l’équipe qui organise les
+          informations du site&nbsp;: il suffit de le demander à l’équipe qui organise les
           challenges, à la salle. La demande est traitée dans un délai d’un mois au plus. En cas
           de désaccord, une réclamation peut être adressée à la CNIL (cnil.fr).
         </p>
@@ -59,7 +56,7 @@ export default function MentionsLegalesPage() {
       <section>
         <h2>Propositions de défis</h2>
         <p>
-          Les idées de défis envoyées depuis la page « Les défis » sont anonymes : aucun nom,
+          Les idées de défis envoyées depuis la page « Défis » sont anonymes : aucun nom,
           aucune adresse e-mail ni adresse IP n’est enregistré avec la proposition.
         </p>
       </section>

@@ -6,8 +6,9 @@ import { useData } from "@/lib/store";
 import {
   buildLeaderboard,
   rankChallenge,
-  METRIC_LABEL,
+  formatScore,
   GENDER_LABEL,
+  F1_POINTS,
   displayName,
   indexParticipants,
   attachParticipants,
@@ -15,64 +16,34 @@ import {
 } from "@/lib/scoring";
 import { endOfDay } from "@/lib/settings";
 
-function useCountdown(target) {
-  const calc = () => {
-    const diff = target - Date.now();
-    if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0, done: true };
-    return {
-      days: Math.floor(diff / 86400000),
-      hours: Math.floor((diff % 86400000) / 3600000),
-      minutes: Math.floor((diff % 3600000) / 60000),
-      seconds: Math.floor((diff % 60000) / 1000),
-      done: false,
-    };
-  };
-  const [time, setTime] = useState(calc);
+const ordinal = (n) => (n === 1 ? "1er" : `${n}e`);
+
+/* « Fin de saison le 1er décembre, dans 34 jours. » Recalculé chaque
+   minute : un compteur à la seconde n'apporte rien à un classement. */
+function useSeasonText(endIso) {
+  const [now, setNow] = useState(null);
   useEffect(() => {
-    setTime(calc());
-    const id = setInterval(() => setTime(calc()), 1000);
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target.getTime()]);
-  return time;
-}
+  }, []);
+  if (!endIso || !now) return null;
 
-function Countdown({ endDate }) {
-  const { days, hours, minutes, seconds, done } = useCountdown(endDate);
-  return (
-    <div className="countdown-panel">
-      <span className="eyebrow">{done ? "Saison terminée" : "Fin du classement"}</span>
-      {done ? (
-        <p className="countdown-done">Bravo à tous les participants.</p>
-      ) : (
-        <div className="countdown">
-          {[[days, "jours"], [hours, "heures"], [minutes, "min"], [seconds, "sec"]].map(
-            ([v, label]) => (
-              <div key={label}>
-                <strong>{String(v).padStart(2, "0")}</strong>
-                <span>{label}</span>
-              </div>
-            )
-          )}
-        </div>
-      )}
-      <span className="countdown-date">
-        {endDate.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
-      </span>
-    </div>
-  );
-}
+  const end = endOfDay(endIso);
+  const parts = new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Europe/Paris",
+    day: "numeric",
+    month: "long",
+  }).formatToParts(end);
+  const day = parts.find((p) => p.type === "day").value;
+  const month = parts.find((p) => p.type === "month").value;
+  const date = `${day === "1" ? "1er" : day} ${month}`;
 
-function GenderFilter({ value, onChange }) {
-  return (
-    <div className="filter-tabs" role="group" aria-label="Catégorie du classement">
-      {[["all", "Tous"], ["H", "Hommes"], ["F", "Femmes"]].map(([key, label]) => (
-        <button key={key} type="button" onClick={() => onChange(key)} aria-pressed={value === key}>
-          {label}
-        </button>
-      ))}
-    </div>
-  );
+  const left = end.getTime() - now;
+  if (left <= 0) return `Saison terminée le ${date}.`;
+  const days = Math.floor(left / 86_400_000);
+  if (days === 0) return `Dernier jour de la saison.`;
+  return `Fin de saison le ${date}, dans ${days} jour${days > 1 ? "s" : ""}.`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -128,8 +99,11 @@ function ParticipantSheet({ person, rows, onClose }) {
       >
         <div className="sheet-head">
           <div>
-            <span className="eyebrow">Rang {String(person.rank).padStart(2, "0")}</span>
             <h2 id="sheet-name">{person.name}</h2>
+            <p>
+              {ordinal(person.rank)} · {person.total} pts sur {rows.length} défi
+              {rows.length > 1 ? "s" : ""}
+            </p>
           </div>
           <button
             ref={closeRef}
@@ -142,49 +116,46 @@ function ParticipantSheet({ person, rows, onClose }) {
           </button>
         </div>
 
-        <div className="sheet-total">
-          <strong>{person.total}</strong>
-          <span>
-            points sur {rows.length} défi{rows.length > 1 ? "s" : ""}
-          </span>
-        </div>
-
         {rows.length === 0 ? (
-          <p className="sheet-empty">Aucune performance enregistrée pour l’instant.</p>
+          <p className="empty">Aucune performance enregistrée pour l’instant.</p>
         ) : (
           <ul className="sheet-list">
             {rows.map((r) => (
               <li key={r.id}>
-                <div className="sheet-row-main">
+                <div className="what">
                   <strong>{r.challengeName}</strong>
-                  <span className="sheet-points">{r.points} pts</span>
+                  <span>
+                    {formatScore(r.raw_value, r.metric)} · {ordinal(r.rank)}
+                  </span>
                 </div>
-                <div className="sheet-row-meta">
-                  <span>{METRIC_LABEL[r.metric]}</span>
-                  <span className="sheet-perf">{r.raw_value}</span>
-                  <span>{r.rank}<sup>{r.rank === 1 ? "er" : "e"}</sup> du défi</span>
-                </div>
+                <span className="pts">{r.points} pts</span>
               </li>
             ))}
           </ul>
         )}
-
-        <Link className="text-link" href="/defis" onClick={onClose}>
-          Voir tous les défis
-        </Link>
       </div>
+    </div>
+  );
+}
+
+function GenderFilter({ value, onChange }) {
+  return (
+    <div className="segmented" role="group" aria-label="Catégorie du classement">
+      {[["all", "Tous"], ["H", "Hommes"], ["F", "Femmes"]].map(([key, label]) => (
+        <button key={key} type="button" onClick={() => onChange(key)} aria-pressed={value === key}>
+          {label}
+        </button>
+      ))}
     </div>
   );
 }
 
 export default function HomePage() {
   // Données partagées avec la page des défis : au retour, rien à recharger.
-  const { data, loading, error } = useData();
+  const { data, loading, error, refresh } = useData();
   const [filter, setFilter] = useState("all");
   const [selectedId, setSelectedId] = useState(null);
-
-  const participants = data?.participants || [];
-  const endDate = data?.countdownEnd;
+  const season = useSeasonText(data?.countdownEnd);
 
   const { counting, activeChallenges, byCh } = useMemo(() => {
     if (!data) return { counting: [], activeChallenges: [], byCh: {} };
@@ -200,11 +171,9 @@ export default function HomePage() {
   }, [data]);
 
   // Filtre "H"/"F" : on écarte les scores des autres AVANT le calcul, donc le
-  // barème F1 est recalculé au sein du groupe (1er du groupe = 25 pts).
+  // barème est recalculé au sein du groupe (1er du groupe = 25 pts).
   const filtered = useMemo(() => filterEntriesByGender(byCh, filter), [byCh, filter]);
   const board = useMemo(() => buildLeaderboard(counting, filtered), [counting, filtered]);
-
-  const hasGenderData = participants.some((p) => p.gender);
   const selected = board.find((p) => p.id === selectedId) || null;
 
   // Détail d'un participant, calculé sur les MÊMES scores que le classement
@@ -236,236 +205,123 @@ export default function HomePage() {
     if (selectedId && !board.some((p) => p.id === selectedId)) setSelectedId(null);
   }, [board, selectedId]);
 
-  return (
-    <div className="home-page">
-      <section className="hero">
-        <div className="hero-copy">
-          <p className="eyebrow">
-            <span className="signal-dot" /> Challenges Basic Fit
-          </p>
-          <h1>
-            Accroche-toi.
-            <br />
-            <span>Dépasse-toi.</span>
-          </h1>
-          <p className="hero-description">
-            Une salle, des défis, et l’envie d’aller plus loin. Chaque participation rapporte
-            des points au classement général.
-          </p>
-          <Link className="primary-link" href="/defis">
-            Découvrir les défis
-          </Link>
-        </div>
-      </section>
+  const participants = data?.participants.length ?? 0;
 
-      <div className="season-strip">
-        <div className="season-stat">
-          <strong>{loading ? "—" : participants.length}</strong>
-          <span>participants</span>
+  return (
+    <>
+      <div className="page-head home-head">
+        <div>
+          <h1>Classement</h1>
+          {data && (
+            <p>
+              {participants} participants, {counting.length} défi{counting.length > 1 ? "s" : ""}.{" "}
+              {season}
+            </p>
+          )}
         </div>
-        <div className="season-stat">
-          <strong>{loading ? "—" : String(counting.length).padStart(2, "0")}</strong>
-          <span>défis comptabilisés</span>
-        </div>
-        {!loading && !error ? (
-          <Countdown endDate={endOfDay(endDate)} />
-        ) : (
-          <div className="countdown-panel">
-            <span className="eyebrow">Chaque effort compte</span>
-          </div>
-        )}
+        <GenderFilter value={filter} onChange={setFilter} />
       </div>
 
-      <div className="competition-layout">
-        <section className="ranking-section" aria-labelledby="ranking-title">
-          <div className="section-heading">
-            <div>
-              <h2 id="ranking-title">
-                Le classement<span className="orange-period">.</span>
-              </h2>
-              <p className="section-intro">Touche un nom pour voir ses défis.</p>
-            </div>
-            <GenderFilter value={filter} onChange={setFilter} />
-          </div>
-
+      <div className="home-layout">
+        <section aria-label="Classement général">
           {loading ? (
-            <div className="empty-state" role="status">
+            <div className="card empty" role="status">
               Chargement du classement…
             </div>
           ) : error ? (
-            <div className="empty-state error-state" role="alert">
-              <h3>Le classement est momentanément indisponible.</h3>
-              <p>Réessaie dans quelques instants.</p>
-              <button className="primary-link" onClick={() => window.location.reload()}>
+            <div className="card empty" role="alert">
+              <strong>Le classement n’a pas pu être chargé.</strong>
+              <p>Vérifie ta connexion, puis réessaie.</p>
+              <button className="btn" style={{ marginTop: 14 }} onClick={() => refresh()}>
                 Réessayer
               </button>
             </div>
           ) : board.length === 0 ? (
-            <div className="empty-state">
-              <h3>La première place t’attend.</h3>
-              <p>
+            <div className="card empty">
+              <strong>
                 {filter === "all"
-                  ? "Aucun score pour l’instant. Rendez-vous à la salle pour le premier défi !"
-                  : `Aucun participant dans la catégorie ${GENDER_LABEL[filter]}.`}
-              </p>
-              {filter !== "all" && !hasGenderData && (
-                <p>Les catégories des participants n’ont pas encore été renseignées.</p>
-              )}
-              <Link href="/defis" className="text-link">
-                Voir les défis
-              </Link>
+                  ? "Aucun score pour l’instant."
+                  : `Personne dans la catégorie ${GENDER_LABEL[filter]} pour l’instant.`}
+              </strong>
+              Les points apparaîtront ici dès le premier défi.
             </div>
           ) : (
-            <>
-              <div className="podium">
-                {board.slice(0, 3).map((p) => (
-                  <button
-                    type="button"
-                    key={p.id}
-                    className={`podium-card podium-${p.rank}`}
-                    onClick={() => setSelectedId(p.id)}
-                  >
-                    <span className="podium-rank">{String(p.rank).padStart(2, "0")}</span>
-                    <span className="podium-name">{p.name}</span>
-                    <span className="podium-score">
-                      {p.total}
-                      <span> pts</span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              <div className="leaderboard">
-                <div className="table-caption">
-                  <h3>Classement général</h3>
-                  <span>
-                    {board.length} participant{board.length > 1 ? "s" : ""}
-                  </span>
-                </div>
-                <table>
-                  <caption className="sr-only">
-                    Classement général — {filter === "all" ? "Tous" : GENDER_LABEL[filter]}
-                  </caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">Rang</th>
-                      <th scope="col">Participant</th>
-                      <th scope="col">Points</th>
+            <div className="card board">
+              <table>
+                <caption className="sr-only">
+                  Classement général — {filter === "all" ? "Tous" : GENDER_LABEL[filter]}. Touche
+                  un nom pour voir ses défis.
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col" className="rank">#</th>
+                    <th scope="col">Participant</th>
+                    <th scope="col">Points</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {board.map((p) => (
+                    <tr
+                      key={p.id}
+                      className={[p.rank <= 3 && "top", p.rank === 1 && "lead"].filter(Boolean).join(" ")}
+                    >
+                      <td className="rank">{p.rank}</td>
+                      <td>
+                        <button type="button" className="row-btn" onClick={() => setSelectedId(p.id)}>
+                          {p.name}
+                        </button>
+                      </td>
+                      <td className="pts">
+                        {p.total}
+                        <small>pts</small>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {board.map((p) => (
-                      <tr key={p.id}>
-                        <td>
-                          <span className={p.rank <= 3 ? "rank-number top-rank" : "rank-number"}>
-                            {String(p.rank).padStart(2, "0")}
-                          </span>
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            className="row-link"
-                            onClick={() => setSelectedId(p.id)}
-                          >
-                            {p.name}
-                          </button>
-                        </td>
-                        <td>
-                          {p.total}
-                          <span className="points-label"> pts</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
 
-        <aside className="challenge-sidebar">
-          <div className="section-heading">
-            <h2>
-              Dans l’arène<span className="orange-period">.</span>
-            </h2>
-          </div>
-          {loading ? (
-            <div className="challenge-preview" role="status">
-              Chargement des défis…
-            </div>
-          ) : activeChallenges.length ? (
-            activeChallenges.map((ch) => {
-              const ranked = rankChallenge(byCh[ch.id] || [], ch.metric);
-              return (
-                <article key={ch.id} className="challenge-preview">
-                  <div className="challenge-meta">
-                    <span className="live-badge">
-                      <span className="signal-dot" /> En cours
-                    </span>
-                    <span>{METRIC_LABEL[ch.metric]}</span>
-                  </div>
-                  <h3>{ch.name}</h3>
-                  {ch.description && <p>{ch.description}</p>}
-                  <div className="mini-ranking">
+        <aside className="side">
+          {activeChallenges.map((ch) => {
+            const ranked = rankChallenge(byCh[ch.id] || [], ch.metric);
+            return (
+              <article key={ch.id} className="card live">
+                <span className="live-tag">En cours</span>
+                <h3>{ch.name}</h3>
+                {ch.description && <p>{ch.description}</p>}
+                {ranked.length > 0 ? (
+                  <ol className="mini">
                     {ranked.slice(0, 3).map((r) => (
-                      <div key={r.id}>
-                        <span className="mini-rank">{r.rank}</span>
+                      <li key={r.id}>
+                        <span>{r.rank}</span>
                         <strong>{displayName(r.participant)}</strong>
-                        <span>{r.raw_value}</span>
-                      </div>
+                        <span>{formatScore(r.raw_value, ch.metric)}</span>
+                      </li>
                     ))}
-                  </div>
-                  {ranked.length === 0 && <p>Sois le premier à poser ton score.</p>}
-                  <Link className="text-link" href="/defis">
-                    Voir les résultats
-                  </Link>
-                </article>
-              );
-            })
-          ) : (
-            <div className="challenge-preview">
-              <h3>{error ? "Retrouve les défis" : "La suite se prépare."}</h3>
-              <p>
-                {error
-                  ? "Consulte les épreuves et leurs résultats."
-                  : "Découvre les résultats et les prochains rendez-vous du club."}
-              </p>
-              <Link className="text-link" href="/defis">
-                Explorer les défis
-              </Link>
-            </div>
-          )}
+                  </ol>
+                ) : (
+                  <p style={{ margin: "12px 0" }}>Pas encore de score.</p>
+                )}
+                <Link className="link" href="/defis">
+                  Tous les résultats
+                </Link>
+              </article>
+            );
+          })}
 
-          <div className="rules-card">
-            <span className="eyebrow">Le jeu est simple</span>
-            <h3>Chaque défi, une nouvelle chance.</h3>
-            <p>
-              Le barème récompense les 10 premiers de chaque défi. Les points s’additionnent au
-              classement général.
-            </p>
-            <div className="points-podium">
-              <span>
-                1er <strong>25 pts</strong>
-              </span>
-              <span>
-                2e <strong>18 pts</strong>
-              </span>
-              <span>
-                3e <strong>15 pts</strong>
-              </span>
-            </div>
-            <p className="rules-footnote">Puis 12, 10, 8, 6, 4, 2 et 1 point.</p>
+          <div className="card rules">
+            <strong>Comment marchent les points</strong>
+            Les 10 premiers de chaque défi marquent {F1_POINTS.slice(0, -1).join(", ")} et{" "}
+            {F1_POINTS.at(-1)} point. Les points s’additionnent d’un défi à l’autre.
           </div>
         </aside>
       </div>
 
       {selected && (
-        <ParticipantSheet
-          person={selected}
-          rows={sheetRows}
-          onClose={() => setSelectedId(null)}
-        />
+        <ParticipantSheet person={selected} rows={sheetRows} onClose={() => setSelectedId(null)} />
       )}
-    </div>
+    </>
   );
 }

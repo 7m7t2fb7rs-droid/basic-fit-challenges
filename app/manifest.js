@@ -5,15 +5,15 @@ export default function manifest() {
     name: "Challenges Basic Fit",
     // Ce qui s'affiche sous l'icône : court, sinon le système le tronque.
     short_name: "Challenges",
-    description: "Classement des défis de la salle — Accroche-toi, Dépasse-toi",
+    description: "Le classement des défis du club, mis à jour à chaque score.",
     lang: "fr",
     start_url: "/",
     scope: "/",
     // Plein écran, sans barre d'adresse.
     display: "standalone",
     orientation: "portrait",
-    background_color: "#f5f3ed", // l'écran de démarrage
-    theme_color: "#ff641f", // la barre de statut
+    background_color: "#f6f5f1", // l'écran de démarrage
+    theme_color: "#f6f5f1", // la barre de statut
     categories: ["sports", "fitness"],
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
@@ -24,7 +24,7 @@ export default function manifest() {
     ],
     shortcuts: [
       { name: "Classement", url: "/" },
-      { name: "Les défis", url: "/defis" },
+      { name: "Défis", url: "/defis" },
     ],
   };
 }

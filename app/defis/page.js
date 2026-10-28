@@ -5,28 +5,20 @@ import { supabase } from "@/lib/supabaseClient";
 import { useData } from "@/lib/store";
 import {
   rankChallenge,
+  formatScore,
   METRIC_LABEL,
-  STATUS_LABEL,
   displayName,
   indexParticipants,
   attachParticipants,
 } from "@/lib/scoring";
 
-function StatusBadge({ status }) {
-  const styles = {
-    upcoming: "bg-neutral-100 text-neutral-600",
-    active: "bg-green-100 text-green-700",
-    finished: "bg-bf-light text-bf-dark",
-  };
-  return (
-    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${styles[status] ?? "bg-neutral-100 text-neutral-600"}`}>
-      {STATUS_LABEL[status]}
-    </span>
-  );
-}
+/* "2026-10-16" → « 16 octobre ». Midi évite qu'un fuseau décalé recule
+   la date d'un jour. */
+const dayMonth = (iso) =>
+  new Date(`${iso}T12:00:00`).toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
 
 /* ------------------------------------------------------------------ */
-/*  Bannière « propose un défi » — dépôt anonyme                       */
+/*  Proposer un défi — dépôt anonyme                                   */
 /*  Rien n'est enregistré sur l'auteur : ni nom, ni adresse IP.        */
 /*  Les propositions ne sont lisibles que depuis l'espace admin.       */
 /* ------------------------------------------------------------------ */
@@ -34,7 +26,7 @@ const TITLE_MAX = 120;
 const DETAILS_MAX = 1000;
 const COOLDOWN_MS = 30_000;
 
-function SuggestionBanner() {
+function SuggestionCard() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
@@ -80,33 +72,35 @@ function SuggestionBanner() {
     } catch {}
     setTitle("");
     setDetails("");
+    setOpen(false);
     setSent(true);
   };
 
   if (sent) {
     return (
-      <div className="suggest-banner suggest-done" role="status">
-        <div>
-          <strong>Merci, c’est noté.</strong>
-          <p>Ton idée part directement à l’équipe. Elle reste anonyme.</p>
+      <div className="card suggest done" role="status">
+        <div className="suggest-top">
+          <div>
+            <strong>Merci, c’est noté.</strong>
+            <p>Ton idée est transmise à l’équipe, sans ton nom.</p>
+          </div>
+          <button type="button" className="btn btn-ghost" onClick={() => setSent(false)}>
+            Proposer autre chose
+          </button>
         </div>
-        <button type="button" className="text-link" onClick={() => setSent(false)}>
-          Proposer autre chose
-        </button>
       </div>
     );
   }
 
   return (
-    <div className="suggest-banner">
-      <div className="suggest-intro">
+    <div className="card suggest">
+      <div className="suggest-top">
         <div>
-          <span className="eyebrow">Une idée&nbsp;?</span>
-          <strong>Propose le prochain défi.</strong>
-          <p>Anonyme — on ne garde ni ton nom ni rien qui permette de te reconnaître.</p>
+          <strong>Une idée de défi ?</strong>
+          <p>Propose-la à l’équipe. C’est anonyme : aucun nom n’est enregistré.</p>
         </div>
         {!open && (
-          <button type="button" className="primary-link" onClick={() => setOpen(true)}>
+          <button type="button" className="btn" onClick={() => setOpen(true)}>
             Proposer un défi
           </button>
         )}
@@ -118,13 +112,14 @@ function SuggestionBanner() {
           <input
             id="suggest-title"
             required
+            autoFocus
             maxLength={TITLE_MAX}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Ex. Gainage planche, Burpees en 2 min…"
+            placeholder="Ex. Burpees en 2 minutes"
           />
           <label htmlFor="suggest-details">
-            Des précisions <span>(facultatif)</span>
+            Précisions <span>(facultatif)</span>
           </label>
           <textarea
             id="suggest-details"
@@ -135,10 +130,10 @@ function SuggestionBanner() {
             placeholder="Comment on le mesure, une règle particulière…"
           />
           <div className="suggest-actions">
-            <button className="primary-link" disabled={busy}>
+            <button className="btn" disabled={busy}>
               {busy ? "Envoi…" : "Envoyer"}
             </button>
-            <button type="button" className="text-link" onClick={() => setOpen(false)}>
+            <button type="button" className="btn btn-ghost" onClick={() => setOpen(false)}>
               Annuler
             </button>
             <span className="suggest-count">
@@ -156,157 +151,161 @@ function SuggestionBanner() {
   );
 }
 
+/* Tableau des résultats d'un défi. */
+function Results({ ranked, metric }) {
+  if (ranked.length === 0) {
+    return <p className="ch-desc" style={{ marginTop: 12 }}>Pas encore de score.</p>;
+  }
+  return (
+    <table className="results">
+      <thead>
+        <tr>
+          <th scope="col">#</th>
+          <th scope="col">Nom</th>
+          <th scope="col">{METRIC_LABEL[metric]}</th>
+          <th scope="col">Points</th>
+        </tr>
+      </thead>
+      <tbody>
+        {ranked.map((r) => (
+          <tr key={r.id} className={r.rank <= 3 ? "top" : undefined}>
+            <td className="r">{r.rank}</td>
+            <td className="n">{displayName(r.participant)}</td>
+            <td className="v">{formatScore(r.raw_value, metric)}</td>
+            <td>{r.points}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 export default function DefisPage() {
   // Mêmes données que la page d'accueil, déjà en mémoire au retour.
-  const { data, loading, error } = useData();
+  const { data, loading, error, refresh } = useData();
 
-  const { challenges, entriesByCh } = useMemo(() => {
-    if (!data) return { challenges: [], entriesByCh: {} };
+  const groups = useMemo(() => {
+    if (!data) return null;
     const byCh = {};
     attachParticipants(data.entries, indexParticipants(data.participants)).forEach((e) => {
       (byCh[e.challenge_id] = byCh[e.challenge_id] || []).push(e);
     });
-    return { challenges: data.challenges, entriesByCh: byCh };
+    const withResults = (c) => ({ ...c, ranked: rankChallenge(byCh[c.id] || [], c.metric) });
+
+    // Le plus récent d'abord ; sans date, on retombe sur l'ordre d'affichage.
+    const recentFirst = (a, b) => {
+      if (a.end_date && b.end_date) return b.end_date.localeCompare(a.end_date);
+      if (a.end_date) return -1;
+      if (b.end_date) return 1;
+      return (b.sort_order ?? 0) - (a.sort_order ?? 0);
+    };
+    // À venir : le prochain d'abord, les dates non fixées à la fin.
+    const soonestFirst = (a, b) => {
+      if (a.end_date && b.end_date) return a.end_date.localeCompare(b.end_date);
+      if (a.end_date) return -1;
+      if (b.end_date) return 1;
+      return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+    };
+
+    const all = data.challenges;
+    return {
+      active: all.filter((c) => c.status === "active").sort(recentFirst).map(withResults),
+      finished: all.filter((c) => c.status === "finished").sort(recentFirst).map(withResults),
+      upcoming: all.filter((c) => c.status === "upcoming").sort(soonestFirst),
+    };
   }, [data]);
 
-  if (loading) return <p className="text-neutral-500">Chargement des défis…</p>;
-  if (error)
-    return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-        {error}
-      </div>
-    );
-
-  // Défis passés et en cours : le plus récent en premier.
-  // On se fie à la date de fin ; sans date, on retombe sur l'ordre d'affichage.
-  const byRecentFirst = (a, b) => {
-    if (a.end_date && b.end_date) return b.end_date.localeCompare(a.end_date);
-    if (a.end_date) return -1;
-    if (b.end_date) return 1;
-    return (b.sort_order ?? 0) - (a.sort_order ?? 0);
-  };
-
-  const current = challenges
-    .filter((c) => c.status !== "upcoming")
-    .sort(byRecentFirst);
-
-  // Les défis à venir restent dans l'ordre chronologique : le prochain d'abord,
-  // et ceux dont la date n'est pas encore fixée à la fin.
-  const bySoonestFirst = (a, b) => {
-    if (a.end_date && b.end_date) return a.end_date.localeCompare(b.end_date);
-    if (a.end_date) return -1;
-    if (b.end_date) return 1;
-    return (a.sort_order ?? 0) - (b.sort_order ?? 0);
-  };
-
-  const upcoming = challenges
-    .filter((c) => c.status === "upcoming")
-    .sort(bySoonestFirst);
-
   return (
-    <div className="challenge-page space-y-8">
-      <div className="page-hero">
-        <p className="eyebrow">LE TERRAIN DE JEU DU CLUB / 02</p>
-        <h1>RELÈVE LE DÉFI<span className="orange-period">.</span></h1>
-        <p className="text-sm text-neutral-500">
-          Trouve ton prochain challenge. Découvre les performances du club et les records à dépasser.
-        </p>
+    <>
+      <div className="page-head">
+        <h1>Défis</h1>
+        <p>Les résultats de chaque défi, et ceux qui arrivent.</p>
       </div>
 
-      <SuggestionBanner />
+      {loading ? (
+        <div className="card empty" role="status">
+          Chargement des défis…
+        </div>
+      ) : error ? (
+        <div className="card empty" role="alert">
+          <strong>Les défis n’ont pas pu être chargés.</strong>
+          <p>Vérifie ta connexion, puis réessaie.</p>
+          <button className="btn" style={{ marginTop: 14 }} onClick={() => refresh()}>
+            Réessayer
+          </button>
+        </div>
+      ) : (
+        <div className="challenges">
+          {groups.active.length > 0 && (
+            <section aria-labelledby="t-active">
+              <h2 id="t-active" className="section-title">En cours</h2>
+              {groups.active.map((c) => (
+                <article key={c.id} className="card ch">
+                  <div className="ch-head">
+                    <h3>{c.name}</h3>
+                    <span className="ch-meta">
+                      {METRIC_LABEL[c.metric]}
+                      {c.end_date && ` · jusqu’au ${dayMonth(c.end_date)}`}
+                    </span>
+                  </div>
+                  {c.description && <p className="ch-desc">{c.description}</p>}
+                  <Results ranked={c.ranked} metric={c.metric} />
+                </article>
+              ))}
+            </section>
+          )}
 
-      {current.map((c) => {
-        const ranked = rankChallenge(entriesByCh[c.id] || [], c.metric);
-        return (
-          <section key={c.id} className="rounded-2xl bg-white p-5 shadow-sm">
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-lg font-bold">{c.name}</h2>
-              <StatusBadge status={c.status} />
-              <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-semibold text-neutral-600">
-                {METRIC_LABEL[c.metric]}
-              </span>
-              {c.end_date && (
-                <span className="ml-auto text-xs text-neutral-500">
-                  Fin : {new Date(`${c.end_date}T12:00:00`).toLocaleDateString("fr-FR")}
-                </span>
-              )}
-            </div>
-            {c.description && (
-              <p className="mt-1 text-sm text-neutral-500">{c.description}</p>
-            )}
+          {groups.finished.length > 0 && (
+            <section aria-labelledby="t-finished">
+              <h2 id="t-finished" className="section-title">Terminés</h2>
+              {groups.finished.map((c) => {
+                // Plusieurs premiers ex æquo : on les cite tous.
+                const winners = c.ranked.filter((r) => r.rank === 1);
+                return (
+                  <details key={c.id} className="card ch">
+                    <summary>
+                      <div className="ch-sum">
+                        <h3>{c.name}</h3>
+                        <span className="ch-meta">
+                          {winners.length
+                            ? `Vainqueur : ${winners.map((w) => displayName(w.participant)).join(" et ")}, ${formatScore(winners[0].raw_value, c.metric)}`
+                            : "Aucun score"}
+                          {c.end_date && ` · ${dayMonth(c.end_date)}`}
+                        </span>
+                      </div>
+                    </summary>
+                    {c.description && <p className="ch-desc">{c.description}</p>}
+                    <Results ranked={c.ranked} metric={c.metric} />
+                  </details>
+                );
+              })}
+            </section>
+          )}
 
-            {ranked.length === 0 ? (
-              <p className="mt-3 text-sm text-neutral-500">
-                Pas encore de performance enregistrée.
-              </p>
-            ) : (
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[300px] text-sm">
-                  <thead>
-                    <tr className="text-left text-xs uppercase tracking-wide text-neutral-500">
-                      <th className="px-2 py-1">Rang</th>
-                      <th className="px-2 py-1">Nom</th>
-                      <th className="px-2 py-1">
-                        {c.metric === "time" ? "Temps" : "Répétitions"}
-                      </th>
-                      <th className="px-2 py-1 text-right">Points</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ranked.map((r) => (
-                      <tr key={r.id} className="border-t border-neutral-100">
-                        <td className="px-2 py-1.5 font-bold text-neutral-500">
-                          <span className={r.rank <= 3 ? "rank-number top-rank" : "rank-number"}>{String(r.rank).padStart(2, "0")}</span>
-                        </td>
-                        <td className="px-2 py-1.5 font-semibold">
-                          {displayName(r.participant)}
-                        </td>
-                        <td className="px-2 py-1.5 text-neutral-600">{r.raw_value}</td>
-                        <td className="text-bf-dark px-2 py-1.5 text-right font-extrabold">
-                          {r.points}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-        );
-      })}
+          {groups.upcoming.length > 0 && (
+            <section aria-labelledby="t-upcoming">
+              <h2 id="t-upcoming" className="section-title">À venir</h2>
+              <ul className="card upcoming">
+                {groups.upcoming.map((c) => (
+                  <li key={c.id}>
+                    <strong>{c.name}</strong>
+                    <span>
+                      {METRIC_LABEL[c.metric]}
+                      {c.end_date && ` · ${dayMonth(c.end_date)}`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
-      {upcoming.length > 0 && (
-        <section>
-          <h2 className="mb-3 text-lg font-bold text-neutral-700">Prochainement</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {upcoming.map((c) => (
-              <div
-                key={c.id}
-                className="rounded-2xl border border-dashed border-neutral-300 bg-white p-4"
-              >
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold">{c.name}</h3>
-                  <StatusBadge status={c.status} />
-                </div>
-                {c.description && (
-                  <p className="mt-1 text-sm text-neutral-500">{c.description}</p>
-                )}
-                <p className="mt-2 text-xs text-neutral-500">
-                  {METRIC_LABEL[c.metric]}
-                  {c.end_date &&
-                    ` · prévu le ${new Date(`${c.end_date}T12:00:00`).toLocaleDateString("fr-FR")}`}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
+          {groups.active.length + groups.finished.length + groups.upcoming.length === 0 && (
+            <div className="card empty">Aucun défi pour l’instant.</div>
+          )}
+
+          <SuggestionCard />
+        </div>
       )}
-
-      {challenges.length === 0 && (
-        <p className="rounded-xl bg-white p-6 text-neutral-500 shadow-sm">
-          Aucun défi pour l&apos;instant.
-        </p>
-      )}
-    </div>
+    </>
   );
 }
